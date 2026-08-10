@@ -13,3 +13,15 @@
 **Env (Vercel + local `.env.local`):**
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY` (publishable / anon — never secret/service_role in client)
+
+## Reviewer demo account (Auth)
+
+| Email | Password | Notes |
+|-------|----------|--------|
+| `reviewer@acme-dataroom.app` | `AcmeReview2026!` | Confirmed via Admin API; no magic-link email required |
+
+Created so take-home reviewers bypass Supabase built-in mailer (~2 emails/hour). Optional later: Resend free SMTP → raise `rate_limit_email_sent` to 30+.
+
+## Owner emails in Auth (do not invent others)
+
+Only touch emails the owner explicitly allows. Current intentional users may include `maskit.inc@gmail.com` + the reviewer demo above.

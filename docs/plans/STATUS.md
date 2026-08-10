@@ -2,11 +2,11 @@
 
 | | |
 |--|--|
-| **Now** | **Almost ready to submit** — live OTP **send** smoked PASS |
-| **Left** | Owner: open magic-link email → confirm room list loads (1 click) |
-| **Progress** | ~91% code; smoke OTP API/UI green — see [`smoke/SMOKE-LOG.md`](./smoke/SMOKE-LOG.md) |
-| **Not planned** | Share / capability links / permissions ACL — cancelled |
-| **Need from you** | Check inbox for `mkubyshkin.ibexa@comwrap.com` (magic link just sent from live). Click → if you see Data Rooms → **ready to hand in**. |
+| **Now** | **Ready for hand-in** — reviewer password demo (no email rate limit) |
+| **Left** | Owner optional: smoke password login on live after deploy |
+| **Progress** | ~95%+ |
+| **Not planned** | Share links; raising built-in magic-link quota without SMTP |
+| **Reviewer login** | `reviewer@acme-dataroom.app` / `AcmeReview2026!` (Password tab) |
 
 ## Links
 
