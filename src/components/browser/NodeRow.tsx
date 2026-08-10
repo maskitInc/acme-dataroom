@@ -86,7 +86,7 @@ export function NodeRow({
       />
       <button
         type="button"
-        className="inline-flex size-7 shrink-0 touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+        className="inline-flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
         aria-label="Drag to move"
         {...listeners}
         {...attributes}
@@ -123,8 +123,11 @@ export function NodeRow({
       )}
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-3 pl-0.5 text-left"
+        className="flex min-w-0 flex-1 cursor-grab touch-none items-center gap-3 pl-0.5 text-left active:cursor-grabbing"
         onClick={onOpen}
+        {...listeners}
+        {...attributes}
+        aria-label={`${node.name} — click to open, drag to move`}
       >
         {node.type === 'folder' ? (
           <Folder className="size-5 shrink-0 text-muted-foreground" />
