@@ -47,3 +47,8 @@
 - [x] Sync checklists
 - [x] Split RoomBrowser → NodeRow, PdfPreviewSheet, BrowserDialogs
 - [x] Ship Phase C
+
+## Stage 17–18 — Phase D FTS
+- [x] Extract PDF text on upload (pdf.js) + texts store (Memory/IDB)
+- [x] `searchInRoom` + SearchHits UI (room-wide name + content)
+- [ ] Ship FTS to Vercel

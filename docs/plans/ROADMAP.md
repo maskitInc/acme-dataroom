@@ -38,7 +38,7 @@ flowchart LR
 | 12 | DnD move via `@dnd-kit` (dialog remains) | MV-04 | 45m |
 | 13 | Ship Extra to prod | Live updated | 10m |
 
-Skip: Auth, Supabase (unless explicitly requested), content PDF search.
+Skip: Auth, Supabase, content PDF search — **reopened as Phase D by owner (2026-08-10).**
 
 ## Phase C — Code quality / granular components (TQ priority #3)
 
@@ -47,6 +47,17 @@ Skip: Auth, Supabase (unless explicitly requested), content PDF search.
 | 14 | Sync checklists to reality | CHECKLISTS accurate | 5m |
 | 15 | Split RoomBrowser → NodeRow, PdfPreview, dialogs | granular comps | 40m |
 | 16 | Ship Phase C | Live + README note | 10m |
+
+## Phase D — Owner order: FTS → Supabase → Auth
+
+| # | Етап | Вихід | Est. | Access |
+|---|------|-------|------|--------|
+| 17 | Full-text PDF: extract on upload, search in room | SE-03 | 60–90m | — |
+| 18 | Ship FTS | Live | 10m | — |
+| 19 | Supabase project: tables + Storage bucket | schema live | 45m | **Supabase** |
+| 20 | `SupabaseRepository` + bootstrap switch | cloud persist | 90m | anon key in Vercel env |
+| 21 | Auth (magic link first; OAuth if easy) | gated rooms per user | 60–90m | Auth enabled |
+| 22 | Ship + README | Live secured | 20m | — |
 
 ## Parallel track (з етапу 4)
 

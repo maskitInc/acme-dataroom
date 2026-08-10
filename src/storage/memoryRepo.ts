@@ -1,9 +1,11 @@
 import { collectDescendants, wouldCreateCycle } from '@/domain/cascade'
 import { uniqueName } from '@/domain/naming'
-import type { DataRoom, Id, Node } from '@/domain/types'
+import { extractPdfText } from '@/domain/pdfText'
+import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
 import { parentKeyOf, ValidationError } from '@/domain/types'
 import { validatePdf } from '@/domain/validatePdf'
 import type { DataRoomRepository } from './repository'
+import { searchNodes } from './search'
 
 function newId(): Id {
   return crypto.randomUUID()
@@ -24,6 +26,7 @@ export class MemoryRepository implements DataRoomRepository {
   private rooms = new Map<Id, DataRoom>()
   private nodes = new Map<Id, Node>()
   private blobs = new Map<Id, Blob>()
+  private texts = new Map<Id, string>()
 
   async listRooms(): Promise<DataRoom[]> {
     return [...this.rooms.values()].sort((a, b) => b.createdAt - a.createdAt)
@@ -41,6 +44,7 @@ export class MemoryRepository implements DataRoomRepository {
     const roomNodes = [...this.nodes.values()].filter((n) => n.dataroomId === id)
     for (const n of roomNodes) {
       if (n.type === 'file' && n.blobKey) this.blobs.delete(n.blobKey)
+      this.texts.delete(n.id)
       this.nodes.delete(n.id)
     }
     this.rooms.delete(id)
@@ -140,6 +144,7 @@ export class MemoryRepository implements DataRoomRepository {
     for (const nid of [...desc, id]) {
       const n = this.nodes.get(nid)
       if (n?.type === 'file' && n.blobKey) this.blobs.delete(n.blobKey)
+      this.texts.delete(nid)
       this.nodes.delete(nid)
     }
   }
@@ -162,6 +167,16 @@ export class MemoryRepository implements DataRoomRepository {
     const finalName = uniqueName(desired, this.siblingNames(dataroomId, parentId))
     const id = newId()
     const t = now()
+    let hasTextIndex = false
+    try {
+      const text = await extractPdfText(file)
+      if (text.trim()) {
+        this.texts.set(id, text)
+        hasTextIndex = true
+      }
+    } catch {
+      // indexing best-effort
+    }
     const node: Node = {
       id,
       dataroomId,
@@ -172,6 +187,7 @@ export class MemoryRepository implements DataRoomRepository {
       mimeType: 'application/pdf',
       size: file.size,
       blobKey: id,
+      hasTextIndex,
       createdAt: t,
       updatedAt: t,
     }
@@ -193,7 +209,13 @@ export class MemoryRepository implements DataRoomRepository {
     const node = this.nodes.get(id)
     if (!node || node.type !== 'file') throw new ValidationError('File not found')
     if (node.blobKey) this.blobs.delete(node.blobKey)
+    this.texts.delete(id)
     this.nodes.delete(id)
+  }
+
+  async searchInRoom(dataroomId: Id, query: string): Promise<SearchHit[]> {
+    const nodes = [...this.nodes.values()].filter((n) => n.dataroomId === dataroomId)
+    return searchNodes(nodes, this.texts, query)
   }
 
   async moveNode(id: Id, newParentId: Id | null): Promise<Node> {

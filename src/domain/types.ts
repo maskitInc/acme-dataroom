@@ -19,8 +19,16 @@ export interface Node {
   mimeType?: 'application/pdf'
   size?: number
   blobKey?: string
+  /** True when PDF text was indexed for full-text search */
+  hasTextIndex?: boolean
   createdAt: number
   updatedAt: number
+}
+
+export interface SearchHit {
+  node: Node
+  match: 'name' | 'content'
+  snippet: string
 }
 
 export const ROOT_KEY = 'root'

@@ -8,9 +8,9 @@ Optimized for: (1) UX/functionality (2) design polish (3) code clarity — per t
 
 ## Stack
 
-Vite + React + TypeScript + Tailwind + shadcn/ui. Client-side persistence via **IndexedDB** (metadata + PDF blobs), as allowed by the brief’s mock CRUD guidance. Falls back to in-memory storage if IndexedDB is unavailable.
+Vite + React + TypeScript + Tailwind + shadcn/ui. Client-side persistence via **IndexedDB** (metadata + PDF blobs + text index), as allowed by the brief’s mock CRUD guidance. Falls back to in-memory storage if IndexedDB is unavailable.
 
-Granular UI: `rooms/`, `browser/` (RoomBrowser + NodeRow), `pdf/`, `dialogs/`.
+Granular UI: `rooms/`, `browser/` (RoomBrowser + NodeRow + SearchHits), `pdf/`, `dialogs/`.
 
 ## Design decisions
 
@@ -19,9 +19,9 @@ Granular UI: `rooms/`, `browser/` (RoomBrowser + NodeRow), `pdf/`, `dialogs/`.
 - **Cascade delete:** deleting a folder removes all nested folders/files and blobs; confirm shows count
 - **PDF viewing:** blob object URLs in a sheet + Open in new tab / Download (mobile-friendly)
 - **Move:** “Move to…” dialog + drag handle (`@dnd-kit`, long-press on touch) onto folders
-- **Filter:** client-side filename filter in the current folder
+- **Search:** room-wide name + PDF text (indexed on upload via pdf.js); UI goes through `repository.searchInRoom`
 - **Upload:** file picker or drop PDF onto the browser area
-- **Out of scope:** auth, cloud blob sync, full-text search, multi-type files, permissions
+- **Out of scope (for now):** auth, cloud blob sync, multi-type files, permissions — Phase D next: Supabase → Auth
 
 ## Setup
 
@@ -40,7 +40,7 @@ npm run build
 1. Create a Data Room (or **Load sample**)
 2. Nest folders, upload PDFs, preview
 3. Upload the same filename again → auto-rename
-4. Filter by name; drop a PDF onto the list
+4. Search by filename or PDF content (room-wide); drop a PDF onto the list
 5. Drag items onto a folder (grip handle) or use Move to…
 6. Delete a folder (cascade)
 7. Refresh — data persists in IndexedDB

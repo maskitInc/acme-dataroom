@@ -219,6 +219,7 @@ export function AppShell({
           return all
         }}
         getFileBlob={(id) => repo.getFileBlob(id)}
+        onSearch={(q) => repo.searchInRoom(currentRoomId, q)}
         countDescendants={async (folderId) => {
           const all: Node[] = []
           async function walk(pid: Id) {

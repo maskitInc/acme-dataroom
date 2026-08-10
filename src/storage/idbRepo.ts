@@ -1,10 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { collectDescendants, wouldCreateCycle } from '@/domain/cascade'
 import { uniqueName } from '@/domain/naming'
-import type { DataRoom, Id, Node } from '@/domain/types'
+import { extractPdfText } from '@/domain/pdfText'
+import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
 import { parentKeyOf, ValidationError } from '@/domain/types'
 import { validatePdf } from '@/domain/validatePdf'
 import type { DataRoomRepository } from './repository'
+import { searchNodes } from './search'
 
 interface AcmeDB extends DBSchema {
   datarooms: {
@@ -25,10 +27,14 @@ interface AcmeDB extends DBSchema {
     key: string
     value: { id: string; blob: Blob }
   }
+  texts: {
+    key: string
+    value: { id: string; text: string }
+  }
 }
 
 const DB_NAME = 'acme-dataroom'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 function newId(): Id {
   return crypto.randomUUID()
@@ -47,14 +53,19 @@ function sortChildren(nodes: Node[]): Node[] {
 
 async function openAcmeDb(): Promise<IDBPDatabase<AcmeDB>> {
   return openDB<AcmeDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      const rooms = db.createObjectStore('datarooms', { keyPath: 'id' })
-      rooms.createIndex('byCreatedAt', 'createdAt')
-      const nodes = db.createObjectStore('nodes', { keyPath: 'id' })
-      nodes.createIndex('byRoom', 'dataroomId')
-      nodes.createIndex('byParent', ['dataroomId', 'parentKey'])
-      nodes.createIndex('byName', ['dataroomId', 'parentKey', 'name'])
-      db.createObjectStore('blobs', { keyPath: 'id' })
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        const rooms = db.createObjectStore('datarooms', { keyPath: 'id' })
+        rooms.createIndex('byCreatedAt', 'createdAt')
+        const nodes = db.createObjectStore('nodes', { keyPath: 'id' })
+        nodes.createIndex('byRoom', 'dataroomId')
+        nodes.createIndex('byParent', ['dataroomId', 'parentKey'])
+        nodes.createIndex('byName', ['dataroomId', 'parentKey', 'name'])
+        db.createObjectStore('blobs', { keyPath: 'id' })
+      }
+      if (oldVersion < 2 && !db.objectStoreNames.contains('texts')) {
+        db.createObjectStore('texts', { keyPath: 'id' })
+      }
     },
   })
 }
@@ -80,10 +91,14 @@ export class IdbRepository implements DataRoomRepository {
   }
 
   async deleteRoom(id: Id): Promise<void> {
-    const tx = this.db.transaction(['nodes', 'blobs', 'datarooms'], 'readwrite')
+    const tx = this.db.transaction(
+      ['nodes', 'blobs', 'texts', 'datarooms'],
+      'readwrite',
+    )
     const roomNodes = await tx.objectStore('nodes').index('byRoom').getAll(id)
     for (const n of roomNodes) {
       if (n.type === 'file' && n.blobKey) await tx.objectStore('blobs').delete(n.blobKey)
+      await tx.objectStore('texts').delete(n.id)
       await tx.objectStore('nodes').delete(n.id)
     }
     await tx.objectStore('datarooms').delete(id)
@@ -183,12 +198,13 @@ export class IdbRepository implements DataRoomRepository {
     }
     const all = await this.allRoomNodes(folder.dataroomId)
     const desc = collectDescendants(id, all)
-    const tx = this.db.transaction(['nodes', 'blobs'], 'readwrite')
+    const tx = this.db.transaction(['nodes', 'blobs', 'texts'], 'readwrite')
     for (const nid of [...desc, id]) {
       const n = all.find((x) => x.id === nid) ?? (await tx.objectStore('nodes').get(nid))
       if (n?.type === 'file' && n.blobKey) {
         await tx.objectStore('blobs').delete(n.blobKey)
       }
+      await tx.objectStore('texts').delete(nid)
       await tx.objectStore('nodes').delete(nid)
     }
     await tx.done
@@ -216,6 +232,14 @@ export class IdbRepository implements DataRoomRepository {
     )
     const id = newId()
     const t = now()
+    let text = ''
+    let hasTextIndex = false
+    try {
+      text = await extractPdfText(file)
+      hasTextIndex = text.trim().length > 0
+    } catch {
+      // best-effort
+    }
     const node: Node = {
       id,
       dataroomId,
@@ -226,12 +250,14 @@ export class IdbRepository implements DataRoomRepository {
       mimeType: 'application/pdf',
       size: file.size,
       blobKey: id,
+      hasTextIndex,
       createdAt: t,
       updatedAt: t,
     }
-    const tx = this.db.transaction(['nodes', 'blobs'], 'readwrite')
+    const tx = this.db.transaction(['nodes', 'blobs', 'texts'], 'readwrite')
     await tx.objectStore('blobs').put({ id, blob: file })
     await tx.objectStore('nodes').put(node)
+    if (hasTextIndex) await tx.objectStore('texts').put({ id, text })
     await tx.done
     return {
       node,
@@ -248,8 +274,9 @@ export class IdbRepository implements DataRoomRepository {
   async deleteFile(id: Id): Promise<void> {
     const node = await this.db.get('nodes', id)
     if (!node || node.type !== 'file') throw new ValidationError('File not found')
-    const tx = this.db.transaction(['nodes', 'blobs'], 'readwrite')
+    const tx = this.db.transaction(['nodes', 'blobs', 'texts'], 'readwrite')
     if (node.blobKey) await tx.objectStore('blobs').delete(node.blobKey)
+    await tx.objectStore('texts').delete(id)
     await tx.objectStore('nodes').delete(id)
     await tx.done
   }
@@ -281,6 +308,17 @@ export class IdbRepository implements DataRoomRepository {
     }
     await this.db.put('nodes', updated)
     return updated
+  }
+
+  async searchInRoom(dataroomId: Id, query: string): Promise<SearchHit[]> {
+    const nodes = await this.allRoomNodes(dataroomId)
+    const texts = new Map<string, string>()
+    for (const n of nodes) {
+      if (n.type !== 'file') continue
+      const row = await this.db.get('texts', n.id)
+      if (row?.text) texts.set(n.id, row.text)
+    }
+    return searchNodes(nodes, texts, query)
   }
 
   async seedSample(): Promise<DataRoom> {

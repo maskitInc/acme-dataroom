@@ -1,4 +1,4 @@
-import type { DataRoom, Id, Node } from '@/domain/types'
+import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
 
 export interface DataRoomRepository {
   listRooms(): Promise<DataRoom[]>
@@ -26,6 +26,9 @@ export interface DataRoomRepository {
   deleteFile(id: Id): Promise<void>
 
   moveNode(id: Id, newParentId: Id | null): Promise<Node>
+
+  /** Room-wide search by filename and/or PDF text index */
+  searchInRoom(dataroomId: Id, query: string): Promise<SearchHit[]>
 
   seedSample(): Promise<DataRoom>
 }

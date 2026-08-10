@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -15,7 +15,7 @@ import {
   Search,
   Upload,
 } from 'lucide-react'
-import type { DataRoom, Id, Node } from '@/domain/types'
+import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { NodeRow } from '@/components/browser/NodeRow'
+import { SearchHits } from '@/components/browser/SearchHits'
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet'
 import {
   CreateFolderDialog,
@@ -36,6 +37,8 @@ import {
   MoveDialog,
   RenameDialog,
 } from '@/components/dialogs/BrowserDialogs'
+
+const SEARCH_DEBOUNCE_MS = 250
 
 export function RoomBrowser({
   room,
@@ -53,6 +56,7 @@ export function RoomBrowser({
   onMove,
   listAllFolders,
   getFileBlob,
+  onSearch,
   countDescendants,
 }: {
   room: DataRoom
@@ -70,10 +74,16 @@ export function RoomBrowser({
   onMove: (id: Id, newParentId: Id | null) => Promise<void>
   listAllFolders: () => Promise<Node[]>
   getFileBlob: (id: Id) => Promise<Blob>
+  onSearch: (query: string) => Promise<SearchHit[]>
   countDescendants: (folderId: Id) => Promise<number>
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<SearchHit[]>([])
+  const [searching, setSearching] = useState(false)
+  const searchGen = useRef(0)
+  const onSearchRef = useRef(onSearch)
+  onSearchRef.current = onSearch
   const [fileDragOver, setFileDragOver] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -96,11 +106,36 @@ export function RoomBrowser({
     }),
   )
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return children
-    return children.filter((n) => n.name.toLowerCase().includes(q))
-  }, [children, query])
+  const searchingRoom = query.trim().length > 0
+
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      searchGen.current += 1
+      setHits([])
+      setSearching(false)
+      return
+    }
+    const gen = ++searchGen.current
+    setSearching(true)
+    const t = window.setTimeout(() => {
+      void onSearchRef
+        .current(q)
+        .then((result) => {
+          if (gen !== searchGen.current) return
+          setHits(result)
+        })
+        .catch((err) => {
+          if (gen !== searchGen.current) return
+          setHits([])
+          toast.error(err instanceof Error ? err.message : 'Search failed')
+        })
+        .finally(() => {
+          if (gen === searchGen.current) setSearching(false)
+        })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(t)
+  }, [query])
 
   useEffect(() => {
     return () => {
@@ -126,6 +161,15 @@ export function RoomBrowser({
     setPreview(null)
     setPreviewUrl(null)
     setPreviewError(null)
+  }
+
+  function openHit(hit: SearchHit) {
+    if (hit.node.type === 'folder') {
+      setQuery('')
+      onNavigate(hit.node.id)
+      return
+    }
+    void openPreview(hit.node)
   }
 
   async function confirmDelete() {
@@ -236,10 +280,10 @@ export function RoomBrowser({
           <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-8"
-            placeholder="Filter by name…"
+            placeholder="Search names & PDF text…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Filter files and folders"
+            aria-label="Search files and folders in this room"
           />
         </div>
         <input
@@ -275,7 +319,15 @@ export function RoomBrowser({
         onDragLeave={() => setFileDragOver(false)}
         onDrop={handleOsFileDrop}
       >
-        {loading ? (
+        {searchingRoom ? (
+          <SearchHits
+            hits={hits}
+            query={query}
+            searching={searching}
+            onOpen={openHit}
+            onClear={() => setQuery('')}
+          />
+        ) : loading ? (
           <p className="p-4 text-muted-foreground">Loading…</p>
         ) : children.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8">
@@ -298,16 +350,6 @@ export function RoomBrowser({
               </Button>
             </div>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8">
-            <p className="font-medium text-foreground">No matches</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Nothing matches “{query.trim()}”.
-            </p>
-            <Button variant="outline" className="mt-4" onClick={() => setQuery('')}>
-              Clear filter
-            </Button>
-          </div>
         ) : (
           <DndContext
             sensors={sensors}
@@ -316,7 +358,7 @@ export function RoomBrowser({
             onDragCancel={() => setActiveDrag(null)}
           >
             <ul className="divide-y rounded-xl border">
-              {filtered.map((node) => (
+              {children.map((node) => (
                 <NodeRow
                   key={node.id}
                   node={node}
