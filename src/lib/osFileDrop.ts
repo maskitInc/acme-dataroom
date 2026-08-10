@@ -53,6 +53,8 @@ export function filesFromDataTransfer(dt: DataTransfer): File[] {
 export type OsFileDropHandlers = {
   onActiveChange: (active: boolean) => void
   onDrop: (files: File[]) => void
+  /** accept (default) = copy cursor + upload; reject = none cursor, still notify onDrop */
+  mode?: 'accept' | 'reject'
 }
 
 /**
@@ -61,6 +63,7 @@ export type OsFileDropHandlers = {
  */
 export function subscribeWindowOsFileDrop(handlers: OsFileDropHandlers): () => void {
   let depth = 0
+  const mode = handlers.mode ?? 'accept'
 
   const reset = () => {
     depth = 0
@@ -77,7 +80,9 @@ export function subscribeWindowOsFileDrop(handlers: OsFileDropHandlers): () => v
   const onOver = (e: DragEvent) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return
     e.preventDefault()
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = mode === 'reject' ? 'none' : 'copy'
+    }
   }
 
   const onLeave = (e: DragEvent) => {

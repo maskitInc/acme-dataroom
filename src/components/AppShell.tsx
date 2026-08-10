@@ -6,10 +6,11 @@ import { ValidationError } from '@/domain/types'
 import { collectDescendants } from '@/domain/cascade'
 import { useRepo } from '@/lib/repo-context'
 import { readNavFromUrl, writeNavToUrl } from '@/lib/navState'
+import { subscribeWindowOsFileDrop } from '@/lib/osFileDrop'
 import { Button } from '@/components/ui/button'
 import { DataRoomList } from '@/components/rooms/DataRoomList'
 import { RoomBrowser } from '@/components/browser/RoomBrowser'
-
+import { FileDropOverlay } from '@/components/browser/FileDropOverlay'
 export function AppShell({
   persistenceDegraded,
   cloudMode = false,
@@ -38,6 +39,26 @@ export function AppShell({
   const skipUrlWrite = useRef(true)
 
   const currentRoom = rooms.find((r) => r.id === currentRoomId) ?? null
+  const onRoomsHome = !currentRoomId || !currentRoom
+  const [homeFileDragActive, setHomeFileDragActive] = useState(false)
+
+  // Rooms list is not an upload target — block OS drops and explain UI
+  useEffect(() => {
+    if (!onRoomsHome) {
+      setHomeFileDragActive(false)
+      return
+    }
+    return subscribeWindowOsFileDrop({
+      mode: 'reject',
+      onActiveChange: setHomeFileDragActive,
+      onDrop: () => {
+        toast.message('Open a Data Room first', {
+          description:
+            'PDFs can only be uploaded inside a Data Room (or a folder within it).',
+        })
+      },
+    })
+  }, [onRoomsHome])
 
   function goHome(mode: 'replace' | 'push' = 'push') {
     setCurrentRoomId(null)
@@ -216,7 +237,8 @@ export function AppShell({
 
   if (!currentRoomId || !currentRoom) {
     return (
-      <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 py-8">
+      <div className="relative mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 py-8">
+        <FileDropOverlay active={homeFileDragActive} variant="reject" />
         {persistenceDegraded && (
           <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Storage unavailable — data lasts until you close the tab.
@@ -249,6 +271,10 @@ export function AppShell({
           </h1>
           <p className="mt-1 text-muted-foreground">
             Virtual data room for due diligence documents
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Open a Data Room to upload PDFs — files cannot be added on this
+            screen.
           </p>
         </header>
         <DataRoomList
