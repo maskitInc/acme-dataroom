@@ -177,12 +177,12 @@ export function PdfPreviewSheet({
         side="bottom"
         showCloseButton={false}
         className={cn(
-          'gap-0 overflow-hidden border-0 bg-neutral-900 p-0 text-white shadow-2xl',
-          // Size: full width mobile; ~90% desktop; tall sheet
-          'w-full max-w-none rounded-t-2xl',
-          'data-[side=bottom]:inset-x-0 data-[side=bottom]:h-[100dvh]',
-          'sm:data-[side=bottom]:inset-x-[5%] sm:data-[side=bottom]:h-[90dvh]',
-          // Full slide up / down (default sheet only nudges 2.5rem)
+          'flex flex-col gap-0 overflow-hidden border-0 bg-neutral-900 p-0 text-white shadow-2xl',
+          // Flush to top (100dvh); desktop ~90% width centered
+          'w-full max-w-none rounded-none',
+          'data-[side=bottom]:inset-x-0 data-[side=bottom]:top-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-[100dvh]',
+          'sm:data-[side=bottom]:inset-x-[5%] sm:data-[side=bottom]:rounded-t-2xl',
+          // Full slide up / down
           'duration-300 ease-out',
           'data-starting-style:opacity-100 data-ending-style:opacity-100',
           'data-[side=bottom]:data-starting-style:translate-y-full',
@@ -191,11 +191,6 @@ export function PdfPreviewSheet({
         )}
       >
         <SheetTitle className="sr-only">{preview?.name ?? 'PDF preview'}</SheetTitle>
-
-        {/* Drag handle */}
-        <div className="flex shrink-0 justify-center pt-2 pb-1">
-          <div className="h-1 w-10 rounded-full bg-white/30" aria-hidden />
-        </div>
 
         <div className="relative min-h-0 flex-1">
           {/* Scroll + pan viewport */}
@@ -219,7 +214,7 @@ export function PdfPreviewSheet({
             {previewUrl && !error && (
               <div
                 data-pdf-pages
-                className="flex min-h-full min-w-full flex-col items-center justify-center px-4 py-16"
+                className="flex min-h-full min-w-full flex-col items-center justify-center px-4 py-8"
               />
             )}
           </div>
