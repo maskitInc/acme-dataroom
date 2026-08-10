@@ -2,11 +2,11 @@
 
 | | |
 |--|--|
-| **Now** | **Submission-ready** — Must + Phase B/C/D done |
-| **Left** | Live magic-link smoke for reviewers; optional tiny polish (not blockers) |
-| **Progress** | ~91% (see [`READINESS.md`](./READINESS.md)) |
-| **Not planned** | Share / capability links / permissions ACL — cancelled (SPEC non-goal) |
-| **Need from you** | Confirm OTP email on live; hand-in when smoke OK |
+| **Now** | **Almost ready to submit** — live OTP **send** smoked PASS |
+| **Left** | Owner: open magic-link email → confirm room list loads (1 click) |
+| **Progress** | ~91% code; smoke OTP API/UI green — see [`smoke/SMOKE-LOG.md`](./smoke/SMOKE-LOG.md) |
+| **Not planned** | Share / capability links / permissions ACL — cancelled |
+| **Need from you** | Check inbox for `mkubyshkin.ibexa@comwrap.com` (magic link just sent from live). Click → if you see Data Rooms → **ready to hand in**. |
 
 ## Links
 
