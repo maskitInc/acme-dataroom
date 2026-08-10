@@ -1,17 +1,16 @@
 # Acme Virtual Data Room (MVP)
 
-**Live:** https://tailored-tech-test-gamma.vercel.app
+**Live:** https://tailored-tech-test-gamma.vercel.app  
+**Усі доступи (швидко):** [`ACCESS.md`](./ACCESS.md)
 
 ### Reviewer sign-in (no email needed)
-
-Built-in Supabase mailer is capped at ~2 magic links/hour. For take-home review use **password**:
 
 | | |
 |--|--|
 | Email | `reviewer@acme-dataroom.app` |
 | Password | `AcmeReview2026!` |
 
-On the login screen choose **Password** (pre-filled). Magic link remains available for owners with custom SMTP.
+Вкладка **Password** на логіні (префіл). Повний чеклист сервісів / env / CLI → [`ACCESS.md`](./ACCESS.md).
 
 ## Priorities
 

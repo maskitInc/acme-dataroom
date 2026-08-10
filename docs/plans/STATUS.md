@@ -6,7 +6,7 @@
 | **Left** | Owner optional: smoke password login on live after deploy |
 | **Progress** | ~95%+ |
 | **Not planned** | Share links; raising built-in magic-link quota without SMTP |
-| **Reviewer login** | `reviewer@acme-dataroom.app` / `AcmeReview2026!` (Password tab) |
+| **Reviewer login** | `reviewer@acme-dataroom.app` / `AcmeReview2026!` — see root [`ACCESS.md`](../../ACCESS.md) |
 
 ## Links
 

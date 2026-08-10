@@ -12,6 +12,8 @@
 
 Unlimited sign-ins for whoever grades the take-home.
 
+**Cheatsheet:** [`../../ACCESS.md`](../../ACCESS.md)
+
 ## Optional later: real magic links ≥5–10/hr
 
 1. Create free [Resend](https://resend.com) account + API key  
