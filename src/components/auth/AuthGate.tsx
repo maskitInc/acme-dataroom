@@ -12,8 +12,8 @@ export const REVIEWER_DEMO = {
 } as const
 
 export function AuthGate() {
-  const [email, setEmail] = useState(REVIEWER_DEMO.email)
-  const [password, setPassword] = useState(REVIEWER_DEMO.password)
+  const [email, setEmail] = useState<string>(REVIEWER_DEMO.email)
+  const [password, setPassword] = useState<string>(REVIEWER_DEMO.password)
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
   const [mode, setMode] = useState<'password' | 'magic'>('password')
