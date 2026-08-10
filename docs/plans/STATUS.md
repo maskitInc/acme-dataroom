@@ -11,19 +11,12 @@
 
 - **Live:** https://tailored-tech-test-gamma.vercel.app
 - **GitHub:** https://github.com/maskitInc/acme-dataroom
-- **Inspect:** https://vercel.com/maksyms-projects-d65b07f5/tailored-tech-test/5CDcDa71ps8WHZEF2Pc3gZiaknQw
+- **Inspect:** https://vercel.com/maksyms-projects-d65b07f5/tailored-tech-test
 
 ## Stage log
 
 | Stage | Status | Note |
 |-------|--------|------|
-| 1 Plans | done | |
-| 2 Scaffold | done | |
-| 3 Domain | done | |
-| 4 Rooms | done | |
-| 5 Folders | done | |
-| 6 PDF | done | |
-| 7 Polish | done | |
-| 8 IDB | done | |
-| 9 Move | done | |
-| 10 Ship | done | Vercel + GitHub |
+| 1–10 | done | GitHub↔Vercel linked manually |
+
+Git push to `main` should now auto-deploy on Vercel.
