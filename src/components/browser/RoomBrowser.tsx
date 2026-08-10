@@ -6,29 +6,16 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-  useDraggable,
-  useDroppable,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
 import {
   ArrowLeft,
-  Download,
-  ExternalLink,
-  FileText,
-  Folder,
   FolderPlus,
-  GripVertical,
-  MoreHorizontal,
-  Pencil,
   Search,
-  Trash2,
   Upload,
-  FolderInput,
 } from 'lucide-react'
 import type { DataRoom, Id, Node } from '@/domain/types'
-import { formatBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,29 +26,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { toast } from 'sonner'
+import { NodeRow } from '@/components/browser/NodeRow'
+import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet'
+import {
+  CreateFolderDialog,
+  DeleteConfirmDialog,
+  MoveDialog,
+  RenameDialog,
+} from '@/components/dialogs/BrowserDialogs'
 
 export function RoomBrowser({
   room,
@@ -380,299 +354,52 @@ export function RoomBrowser({
         )}
       </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New folder</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-2">
-            <Label htmlFor="folder-name">Name</Label>
-            <Input
-              id="folder-name"
-              value={folderName}
-              onChange={(e) => setFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && folderName.trim()) {
-                  void onCreateFolder(folderName).then(() => setCreateOpen(false))
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!folderName.trim()}
-              onClick={() =>
-                void onCreateFolder(folderName).then(() => setCreateOpen(false))
-              }
-            >
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
+      <CreateFolderDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        name={folderName}
+        setName={setFolderName}
+        onSubmit={() =>
+          void onCreateFolder(folderName).then(() => setCreateOpen(false))
+        }
+      />
+      <RenameDialog
         open={!!renameTarget}
         onOpenChange={(o) => !o && setRenameTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && renameTarget && renameValue.trim()) {
-                void onRename(renameTarget.id, renameValue).then(() =>
-                  setRenameTarget(null),
-                )
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!renameValue.trim()}
-              onClick={() => {
-                if (renameTarget)
-                  void onRename(renameTarget.id, renameValue).then(() =>
-                    setRenameTarget(null),
-                  )
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
+        value={renameValue}
+        setValue={setRenameValue}
+        onSubmit={() => {
+          if (renameTarget)
+            void onRename(renameTarget.id, renameValue).then(() =>
+              setRenameTarget(null),
+            )
+        }}
+      />
+      <DeleteConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {deleteTarget?.type === 'folder' ? 'Delete folder?' : 'Delete file?'}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            {deleteTarget?.type === 'folder'
-              ? `Delete “${deleteTarget.name}” and ${deleteCount} items inside?`
-              : `Delete “${deleteTarget?.name}”?`}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={() => void confirmDelete()}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!moveTarget} onOpenChange={(o) => !o && setMoveTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Move “{moveTarget?.name}”</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-64 space-y-1 overflow-auto">
-            <button
-              type="button"
-              className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
-                moveDest === null ? 'bg-muted' : 'hover:bg-muted/50'
-              }`}
-              onClick={() => setMoveDest(null)}
-            >
-              Room root
-            </button>
-            {folders.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
-                  moveDest === f.id ? 'bg-muted' : 'hover:bg-muted/50'
-                }`}
-                onClick={() => setMoveDest(f.id)}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMoveTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (moveTarget)
-                  void onMove(moveTarget.id, moveDest).then(() =>
-                    setMoveTarget(null),
-                  )
-              }}
-            >
-              Move
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Sheet
-        open={!!preview}
-        onOpenChange={(o) => {
-          if (!o) closePreview()
+        target={deleteTarget}
+        deleteCount={deleteCount}
+        onConfirm={() => void confirmDelete()}
+      />
+      <MoveDialog
+        open={!!moveTarget}
+        onOpenChange={(o) => !o && setMoveTarget(null)}
+        targetName={moveTarget?.name}
+        folders={folders}
+        moveDest={moveDest}
+        setMoveDest={setMoveDest}
+        onConfirm={() => {
+          if (moveTarget)
+            void onMove(moveTarget.id, moveDest).then(() => setMoveTarget(null))
         }}
-      >
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle className="truncate pr-8">{preview?.name}</SheetTitle>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 px-4">
-            {previewError && (
-              <p className="text-sm text-destructive">{previewError}</p>
-            )}
-            {!previewError && !previewUrl && (
-              <p className="text-muted-foreground">Loading…</p>
-            )}
-            {previewUrl && (
-              <iframe
-                title={preview?.name ?? 'PDF'}
-                src={previewUrl}
-                className="h-[70vh] w-full rounded-md border bg-white"
-              />
-            )}
-          </div>
-          <SheetFooter className="flex-row gap-2 sm:justify-start">
-            <Button
-              variant="outline"
-              disabled={!previewUrl}
-              onClick={() => {
-                if (previewUrl) window.open(previewUrl, '_blank')
-              }}
-            >
-              <ExternalLink /> Open in new tab
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!previewUrl || !preview}
-              onClick={() => {
-                if (!previewUrl || !preview) return
-                const a = document.createElement('a')
-                a.href = previewUrl
-                a.download = preview.name
-                a.click()
-              }}
-            >
-              <Download /> Download
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      />
+      <PdfPreviewSheet
+        preview={preview}
+        previewUrl={previewUrl}
+        previewError={previewError}
+        onClose={closePreview}
+      />
     </div>
-  )
-}
-
-function NodeRow({
-  node,
-  onOpen,
-  onRename,
-  onMove,
-  onDelete,
-}: {
-  node: Node
-  onOpen: () => void
-  onRename: () => void
-  onMove: () => void
-  onDelete: () => void
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef: setDragRef,
-    transform,
-    isDragging,
-  } = useDraggable({
-    id: `drag-${node.id}`,
-    data: { node },
-  })
-
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `drop-${node.id}`,
-    data: { folderId: node.id },
-    disabled: node.type !== 'folder',
-  })
-
-  function setRefs(el: HTMLLIElement | null) {
-    setDragRef(el)
-    if (node.type === 'folder') setDropRef(el)
-  }
-
-  return (
-    <li
-      ref={setRefs}
-      style={{ transform: CSS.Translate.toString(transform) }}
-      className={cn(
-        'flex items-center gap-1 px-2 py-2.5 hover:bg-muted/40',
-        isDragging && 'opacity-40',
-        isOver && node.type === 'folder' && 'bg-primary/10 ring-1 ring-primary/40',
-      )}
-    >
-      <button
-        type="button"
-        className="inline-flex size-7 shrink-0 touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-        aria-label="Drag to move"
-        {...listeners}
-        {...attributes}
-      >
-        <GripVertical className="size-4" />
-      </button>
-      <button
-        type="button"
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-        onClick={onOpen}
-      >
-        {node.type === 'folder' ? (
-          <Folder className="size-5 shrink-0 text-muted-foreground" />
-        ) : (
-          <FileText className="size-5 shrink-0 text-muted-foreground" />
-        )}
-        <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">{node.name}</div>
-          {node.type === 'file' && (
-            <div className="text-xs text-muted-foreground">
-              {formatBytes(node.size)} ·{' '}
-              {new Date(node.updatedAt).toLocaleDateString()}
-            </div>
-          )}
-        </div>
-      </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className="inline-flex size-7 items-center justify-center rounded-lg hover:bg-muted"
-          aria-label="Item actions"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreHorizontal className="size-4" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onRename}>
-            <Pencil /> Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onMove}>
-            <FolderInput /> Move to…
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onDelete}>
-            <Trash2 /> Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </li>
   )
 }

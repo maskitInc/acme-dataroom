@@ -2,8 +2,8 @@
 
 | | |
 |--|--|
-| **Now** | Stage **13 / 13** — Done (Must + Extra ROI) |
-| **Left** | nothing critical (Auth/Supabase skipped per plan) |
+| **Now** | Stage **16 / 16** — Done |
+| **Left** | nothing critical |
 | **Progress** | 100% |
 | **Need from you** | Nothing |
 
@@ -17,8 +17,7 @@
 | # | Stage | Status |
 |---|-------|--------|
 | 1–10 | Must MVP + ship | done |
-| 11 | Filename filter + PDF dropzone | done |
-| 12 | DnD move (`@dnd-kit`) | done |
-| 13 | Push + auto-deploy | done (Ready) |
+| 11–13 | Extra ROI | done |
+| 14–16 | Phase C granular refactor + ship | done |
 
-Skipped by design: Auth, Supabase, full-text PDF search.
+Still skipped by design: Auth, Supabase, full-text PDF search.

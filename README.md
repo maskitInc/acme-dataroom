@@ -10,6 +10,8 @@ Optimized for: (1) UX/functionality (2) design polish (3) code clarity — per t
 
 Vite + React + TypeScript + Tailwind + shadcn/ui. Client-side persistence via **IndexedDB** (metadata + PDF blobs), as allowed by the brief’s mock CRUD guidance. Falls back to in-memory storage if IndexedDB is unavailable.
 
+Granular UI: `rooms/`, `browser/` (RoomBrowser + NodeRow), `pdf/`, `dialogs/`.
+
 ## Design decisions
 
 - **Data model:** flat adjacency list (`parentId`) for nested folders/files within a Data Room

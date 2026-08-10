@@ -40,6 +40,14 @@ flowchart LR
 
 Skip: Auth, Supabase (unless explicitly requested), content PDF search.
 
+## Phase C — Code quality / granular components (TQ priority #3)
+
+| # | Етап | Вихід | Est. |
+|---|------|-------|------|
+| 14 | Sync checklists to reality | CHECKLISTS accurate | 5m |
+| 15 | Split RoomBrowser → NodeRow, PdfPreview, dialogs | granular comps | 40m |
+| 16 | Ship Phase C | Live + README note | 10m |
+
 ## Parallel track (з етапу 4)
 
 - `git init` / commit  
