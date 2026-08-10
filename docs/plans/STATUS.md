@@ -2,9 +2,9 @@
 
 | | |
 |--|--|
-| **Now** | Stage **13 / 13** — shipping Extra to prod |
-| **Left** | auto-deploy verify |
-| **Progress** | 98% |
+| **Now** | Stage **13 / 13** — Done (Must + Extra ROI) |
+| **Left** | nothing critical (Auth/Supabase skipped per plan) |
+| **Progress** | 100% |
 | **Need from you** | Nothing |
 
 ## Links
@@ -19,4 +19,6 @@
 | 1–10 | Must MVP + ship | done |
 | 11 | Filename filter + PDF dropzone | done |
 | 12 | DnD move (`@dnd-kit`) | done |
-| 13 | Push + verify auto-deploy | in progress |
+| 13 | Push + auto-deploy | done (Ready) |
+
+Skipped by design: Auth, Supabase, full-text PDF search.
