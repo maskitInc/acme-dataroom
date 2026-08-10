@@ -104,7 +104,7 @@ export function PdfPreviewSheet({
           canvas.style.width = `${viewport.width / devicePixelRatio}px`
           canvas.style.height = `${viewport.height / devicePixelRatio}px`
           canvas.className =
-            'mx-auto mb-4 block max-w-full bg-white shadow-md last:mb-0'
+            'mx-auto mb-6 block max-w-none bg-white shadow-md last:mb-0'
           const ctx = canvas.getContext('2d')
           if (!ctx) continue
           await page.render({ canvas, canvasContext: ctx, viewport }).promise
@@ -216,7 +216,7 @@ export function PdfPreviewSheet({
             {previewUrl && !error && (
               <div
                 data-pdf-pages
-                className="flex min-h-full min-w-full flex-col items-center justify-center px-4 py-8"
+                className="flex min-h-full min-w-full flex-col items-center justify-center px-12 pt-28 pb-32 sm:px-16 sm:pt-32 sm:pb-36"
               />
             )}
           </div>
