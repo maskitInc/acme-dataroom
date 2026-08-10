@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +16,8 @@ import {
   Upload,
 } from 'lucide-react'
 import type { DataRoom, Id, Node, SearchHit, UploadProgress } from '@/domain/types'
+import { wouldCreateCycle } from '@/domain/cascade'
+import { flattenOutline } from '@/domain/tree'
 import { cn } from '@/lib/utils'
 import { subscribeWindowOsFileDrop } from '@/lib/osFileDrop'
 import { Button } from '@/components/ui/button'
@@ -45,9 +47,9 @@ const SEARCH_DEBOUNCE_MS = 250
 
 export function RoomBrowser({
   room,
-  parentId: _parentId,
+  parentId,
   crumbs,
-  children,
+  roomNodes,
   loading,
   onBackHome,
   onNavigate,
@@ -57,7 +59,6 @@ export function RoomBrowser({
   onDeleteFile,
   onUpload,
   onMove,
-  listAllFolders,
   getFileBlob,
   onSearch,
   countDescendants,
@@ -65,7 +66,7 @@ export function RoomBrowser({
   room: DataRoom
   parentId: Id | null
   crumbs: Node[]
-  children: Node[]
+  roomNodes: Node[]
   loading: boolean
   onBackHome: () => void
   onNavigate: (folderId: Id | null) => void
@@ -78,7 +79,6 @@ export function RoomBrowser({
     onProgress?: (p: UploadProgress) => void,
   ) => Promise<void>
   onMove: (id: Id, newParentId: Id | null) => Promise<void>
-  listAllFolders: () => Promise<Node[]>
   getFileBlob: (id: Id) => Promise<Blob>
   onSearch: (query: string) => Promise<SearchHit[]>
   countDescendants: (folderId: Id) => Promise<number>
@@ -103,12 +103,41 @@ export function RoomBrowser({
   const [deleteTarget, setDeleteTarget] = useState<Node | null>(null)
   const [deleteCount, setDeleteCount] = useState(0)
   const [moveTarget, setMoveTarget] = useState<Node | null>(null)
-  const [folders, setFolders] = useState<Node[]>([])
   const [moveDest, setMoveDest] = useState<Id | null>(null)
   const [preview, setPreview] = useState<Node | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [activeDrag, setActiveDrag] = useState<Node | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<Id>>(() => new Set())
+
+  const nodeIds = useMemo(
+    () => new Set(roomNodes.map((n) => n.id)),
+    [roomNodes],
+  )
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      let changed = false
+      const next = new Set<Id>()
+      for (const id of prev) {
+        if (nodeIds.has(id)) next.add(id)
+        else changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [nodeIds])
+
+  const outlineRows = useMemo(
+    () => flattenOutline(roomNodes, parentId, expandedIds),
+    [roomNodes, parentId, expandedIds],
+  )
+  const nodesById = useMemo(
+    () => new Map(roomNodes.map((n) => [n.id, n])),
+    [roomNodes],
+  )
+  const moveFolders = useMemo(
+    () => roomNodes.filter((n) => n.type === 'folder'),
+    [roomNodes],
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -226,11 +255,18 @@ export function RoomBrowser({
     setDeleteTarget(null)
   }
 
-  async function openMove(node: Node) {
+  function openMove(node: Node) {
     setMoveTarget(node)
     setMoveDest(null)
-    const all = await listAllFolders()
-    setFolders(all.filter((f) => f.id !== node.id))
+  }
+
+  function toggleExpand(id: Id) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   function onDragStart(event: DragStartEvent) {
@@ -246,6 +282,10 @@ export function RoomBrowser({
     const folderId = over.data.current?.folderId as Id | undefined
     if (!dragged || !folderId) return
     if (dragged.id === folderId) return
+    if (wouldCreateCycle(dragged.id, folderId, nodesById)) {
+      toast.error('Cannot move a folder into itself or a descendant')
+      return
+    }
     try {
       await onMove(dragged.id, folderId)
     } catch (err) {
@@ -363,7 +403,7 @@ export function RoomBrowser({
           />
         ) : loading ? (
           <p className="p-4 text-muted-foreground">Loading…</p>
-        ) : children.length === 0 ? (
+        ) : outlineRows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-muted-foreground/40 p-8">
             <p className="font-medium text-foreground">This folder is empty</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -393,10 +433,14 @@ export function RoomBrowser({
             onDragCancel={() => setActiveDrag(null)}
           >
             <ul className="divide-y rounded-xl border">
-              {children.map((node) => (
+              {outlineRows.map(({ node, depth, hasChildren }) => (
                 <NodeRow
                   key={node.id}
                   node={node}
+                  depth={depth}
+                  hasChildren={hasChildren}
+                  expanded={expandedIds.has(node.id)}
+                  onToggleExpand={() => toggleExpand(node.id)}
                   onOpen={() => {
                     if (node.type === 'folder') onNavigate(node.id)
                     else void openPreview(node)
@@ -405,7 +449,7 @@ export function RoomBrowser({
                     setRenameTarget(node)
                     setRenameValue(node.name)
                   }}
-                  onMove={() => void openMove(node)}
+                  onMove={() => openMove(node)}
                   onDelete={() => {
                     void (async () => {
                       setDeleteTarget(node)
@@ -459,8 +503,8 @@ export function RoomBrowser({
       <MoveDialog
         open={!!moveTarget}
         onOpenChange={(o) => !o && setMoveTarget(null)}
-        targetName={moveTarget?.name}
-        folders={folders}
+        target={moveTarget}
+        folders={moveFolders}
         moveDest={moveDest}
         setMoveDest={setMoveDest}
         onConfirm={() => {

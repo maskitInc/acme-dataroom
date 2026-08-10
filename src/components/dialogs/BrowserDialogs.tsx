@@ -1,4 +1,11 @@
+import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
 import type { Id, Node } from '@/domain/types'
+import {
+  blockedMoveFolderIds,
+  flattenOutline,
+} from '@/domain/tree'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -131,10 +138,12 @@ export function DeleteConfirmDialog({
   )
 }
 
+const MOVE_INDENT = 14
+
 export function MoveDialog({
   open,
   onOpenChange,
-  targetName,
+  target,
   folders,
   moveDest,
   setMoveDest,
@@ -142,40 +151,100 @@ export function MoveDialog({
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
-  targetName?: string
+  target: Node | null
   folders: Node[]
   moveDest: Id | null
   setMoveDest: (id: Id | null) => void
   onConfirm: () => void
 }) {
+  const [expanded, setExpanded] = useState<Set<Id>>(() => new Set())
+
+  useEffect(() => {
+    if (!open) setExpanded(new Set())
+  }, [open])
+
+  const blocked = target
+    ? blockedMoveFolderIds(target, folders)
+    : new Set<Id>()
+  const allowed = folders.filter((f) => !blocked.has(f.id))
+  const rows = flattenOutline(allowed, null, expanded, { foldersOnly: true })
+
+  function toggle(id: Id) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Move “{targetName}”</DialogTitle>
+          <DialogTitle>Move “{target?.name}”</DialogTitle>
         </DialogHeader>
-        <div className="max-h-64 space-y-1 overflow-auto">
+        <div className="max-h-72 space-y-0.5 overflow-auto">
           <button
             type="button"
-            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
-              moveDest === null ? 'bg-muted' : 'hover:bg-muted/50'
-            }`}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm',
+              moveDest === null ? 'bg-muted' : 'hover:bg-muted/50',
+            )}
             onClick={() => setMoveDest(null)}
           >
+            <span className="inline-flex size-6 shrink-0" aria-hidden />
+            <Folder className="size-4 shrink-0 text-muted-foreground" />
             Room root
           </button>
-          {folders.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
-                moveDest === f.id ? 'bg-muted' : 'hover:bg-muted/50'
-              }`}
-              onClick={() => setMoveDest(f.id)}
-            >
-              {f.name}
-            </button>
-          ))}
+          {rows.map(({ node, depth, hasChildren }) => {
+            const isOpen = expanded.has(node.id)
+            return (
+              <div
+                key={node.id}
+                className={cn(
+                  'flex w-full items-center gap-0.5 rounded-md text-sm',
+                  moveDest === node.id ? 'bg-muted' : 'hover:bg-muted/50',
+                )}
+              >
+                <span
+                  className="shrink-0"
+                  style={{ width: depth * MOVE_INDENT }}
+                  aria-hidden
+                />
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground',
+                    hasChildren ? 'hover:bg-muted' : 'opacity-30',
+                  )}
+                  aria-label={
+                    isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`
+                  }
+                  aria-expanded={hasChildren ? isOpen : undefined}
+                  disabled={!hasChildren}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggle(node.id)
+                  }}
+                >
+                  {isOpen ? (
+                    <ChevronDown className="size-3.5" />
+                  ) : (
+                    <ChevronRight className="size-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-left"
+                  onClick={() => setMoveDest(node.id)}
+                >
+                  <Folder className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{node.name}</span>
+                </button>
+              </div>
+            )
+          })}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

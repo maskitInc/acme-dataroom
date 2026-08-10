@@ -4,6 +4,8 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import {
+  ChevronDown,
+  ChevronRight,
   FileText,
   Folder,
   FolderInput,
@@ -22,14 +24,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+const INDENT_PX = 16
+
 export function NodeRow({
   node,
+  depth = 0,
+  hasChildren = false,
+  expanded = false,
+  onToggleExpand,
   onOpen,
   onRename,
   onMove,
   onDelete,
 }: {
   node: Node
+  depth?: number
+  hasChildren?: boolean
+  expanded?: boolean
+  onToggleExpand?: () => void
   onOpen: () => void
   onRename: () => void
   onMove: () => void
@@ -62,11 +74,16 @@ export function NodeRow({
       ref={setRefs}
       style={{ transform: CSS.Translate.toString(transform) }}
       className={cn(
-        'flex items-center gap-1 px-2 py-2.5 hover:bg-muted/40',
+        'flex items-center gap-0.5 py-2.5 pr-2 hover:bg-muted/40',
         isDragging && 'opacity-40',
         isOver && node.type === 'folder' && 'bg-primary/10 ring-1 ring-primary/40',
       )}
     >
+      <span
+        className="shrink-0"
+        style={{ width: depth * INDENT_PX }}
+        aria-hidden
+      />
       <button
         type="button"
         className="inline-flex size-7 shrink-0 touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
@@ -76,9 +93,37 @@ export function NodeRow({
       >
         <GripVertical className="size-4" />
       </button>
+      {node.type === 'folder' ? (
+        <button
+          type="button"
+          className={cn(
+            'inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground',
+            hasChildren ? 'hover:bg-muted' : 'opacity-30',
+          )}
+          aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+          aria-expanded={hasChildren ? expanded : undefined}
+          disabled={!hasChildren}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleExpand?.()
+          }}
+        >
+          {hasChildren ? (
+            expanded ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )
+          ) : (
+            <ChevronRight className="size-4" />
+          )}
+        </button>
+      ) : (
+        <span className="inline-flex size-7 shrink-0" aria-hidden />
+      )}
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        className="flex min-w-0 flex-1 items-center gap-3 pl-0.5 text-left"
         onClick={onOpen}
       >
         {node.type === 'folder' ? (

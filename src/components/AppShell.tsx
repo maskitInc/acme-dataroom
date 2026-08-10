@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { LogOut } from 'lucide-react'
 import type { DataRoom, Id, Node } from '@/domain/types'
 import { ValidationError } from '@/domain/types'
+import { collectDescendants } from '@/domain/cascade'
 import { useRepo } from '@/lib/repo-context'
 import { readNavFromUrl, writeNavToUrl } from '@/lib/navState'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,7 @@ export function AppShell({
   const [currentParentId, setCurrentParentId] = useState<Id | null>(
     initialNav.current.folderId,
   )
-  const [children, setChildren] = useState<Node[]>([])
+  const [roomNodes, setRoomNodes] = useState<Node[]>([])
   const [crumbs, setCrumbs] = useState<Node[]>([])
   const [loadingChildren, setLoadingChildren] = useState(false)
   const [navValidated, setNavValidated] = useState(!initialNav.current.roomId)
@@ -69,11 +70,11 @@ export function AppShell({
   async function refreshBrowser(roomId: Id, parentId: Id | null) {
     setLoadingChildren(true)
     try {
-      const [kids, bread] = await Promise.all([
-        repo.listChildren(roomId, parentId),
+      const [nodes, bread] = await Promise.all([
+        repo.listRoomNodes(roomId),
         repo.getBreadcrumbs(roomId, parentId),
       ])
-      setChildren(kids)
+      setRoomNodes(nodes)
       setCrumbs(bread)
     } finally {
       setLoadingChildren(false)
@@ -288,7 +289,7 @@ export function AppShell({
         room={currentRoom}
         parentId={currentParentId}
         crumbs={crumbs}
-        children={children}
+        roomNodes={roomNodes}
         loading={loadingChildren}
         onBackHome={() => goHome()}
         onNavigate={(folderId) => openFolder(folderId)}
@@ -351,34 +352,11 @@ export function AppShell({
             toast.success('Moved')
           })
         }
-        listAllFolders={async () => {
-          const all: Node[] = []
-          async function walk(pid: Id | null) {
-            const kids = await repo.listChildren(currentRoomId!, pid)
-            for (const k of kids) {
-              if (k.type === 'folder') {
-                all.push(k)
-                await walk(k.id)
-              }
-            }
-          }
-          await walk(null)
-          return all
-        }}
         getFileBlob={(id) => repo.getFileBlob(id)}
         onSearch={(q) => repo.searchInRoom(currentRoomId, q)}
-        countDescendants={async (folderId) => {
-          const all: Node[] = []
-          async function walk(pid: Id) {
-            const kids = await repo.listChildren(currentRoomId!, pid)
-            for (const k of kids) {
-              all.push(k)
-              if (k.type === 'folder') await walk(k.id)
-            }
-          }
-          await walk(folderId)
-          return all.length
-        }}
+        countDescendants={async (folderId) =>
+          collectDescendants(folderId, roomNodes).length
+        }
       />
     </div>
   )

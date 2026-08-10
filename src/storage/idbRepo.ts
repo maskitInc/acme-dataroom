@@ -147,6 +147,10 @@ export class IdbRepository implements DataRoomRepository {
     return this.db.getAllFromIndex('nodes', 'byRoom', dataroomId)
   }
 
+  async listRoomNodes(dataroomId: Id): Promise<Node[]> {
+    return this.allRoomNodes(dataroomId)
+  }
+
   async createFolder(
     dataroomId: Id,
     parentId: Id | null,

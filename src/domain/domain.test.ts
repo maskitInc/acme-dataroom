@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { uniqueName } from './naming'
 import { collectDescendants, wouldCreateCycle } from './cascade'
+import {
+  blockedMoveFolderIds,
+  flattenOutline,
+} from './tree'
 import type { Node } from './types'
 import { validatePdf } from './validatePdf'
 
@@ -96,5 +100,109 @@ describe('validatePdf', () => {
   it('rejects png', () => {
     const f = new File(['x'], 'a.png', { type: 'image/png' })
     expect(validatePdf(f).ok).toBe(false)
+  })
+})
+
+describe('flattenOutline', () => {
+  const nodes: Node[] = [
+    {
+      id: 'F',
+      dataroomId: 'r',
+      parentId: null,
+      type: 'folder',
+      name: 'Finance',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'L',
+      dataroomId: 'r',
+      parentId: null,
+      type: 'folder',
+      name: 'Legal',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'C',
+      dataroomId: 'r',
+      parentId: 'L',
+      type: 'folder',
+      name: 'Contracts',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'p',
+      dataroomId: 'r',
+      parentId: 'C',
+      type: 'file',
+      name: 'x.pdf',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]
+
+  it('shows only root children when collapsed', () => {
+    const rows = flattenOutline(nodes, null, new Set())
+    expect(rows.map((r) => r.node.id)).toEqual(['F', 'L'])
+    expect(rows.find((r) => r.node.id === 'L')?.hasChildren).toBe(true)
+  })
+
+  it('reveals nested when expanded', () => {
+    const rows = flattenOutline(nodes, null, new Set(['L', 'C']))
+    expect(rows.map((r) => [r.node.id, r.depth])).toEqual([
+      ['F', 0],
+      ['L', 0],
+      ['C', 1],
+      ['p', 2],
+    ])
+  })
+
+  it('foldersOnly skips files', () => {
+    const rows = flattenOutline(nodes, null, new Set(['L', 'C']), {
+      foldersOnly: true,
+    })
+    expect(rows.map((r) => r.node.id)).toEqual(['F', 'L', 'C'])
+  })
+})
+
+describe('blockedMoveFolderIds', () => {
+  const nodes: Node[] = [
+    {
+      id: 'A',
+      dataroomId: 'r',
+      parentId: null,
+      type: 'folder',
+      name: 'A',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'B',
+      dataroomId: 'r',
+      parentId: 'A',
+      type: 'folder',
+      name: 'B',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'f',
+      dataroomId: 'r',
+      parentId: 'A',
+      type: 'file',
+      name: 'f.pdf',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]
+  it('blocks self and descendant folders', () => {
+    expect(
+      [...blockedMoveFolderIds(nodes[0]!, nodes)].sort(),
+    ).toEqual(['A', 'B'])
+  })
+  it('empty for files', () => {
+    expect(blockedMoveFolderIds(nodes[2]!, nodes).size).toBe(0)
   })
 })

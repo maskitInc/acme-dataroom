@@ -159,6 +159,10 @@ export class SupabaseRepository implements DataRoomRepository {
     return (data as NodeRow[]).map(mapNode)
   }
 
+  async listRoomNodes(dataroomId: Id): Promise<Node[]> {
+    return this.allRoomNodes(dataroomId)
+  }
+
   private async fileNodesInRoom(dataroomId: Id): Promise<NodeRow[]> {
     const { data, error } = await this.client
       .from('nodes')

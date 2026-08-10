@@ -57,6 +57,10 @@ export class MemoryRepository implements DataRoomRepository {
     return sortChildren(children)
   }
 
+  async listRoomNodes(dataroomId: Id): Promise<Node[]> {
+    return [...this.nodes.values()].filter((n) => n.dataroomId === dataroomId)
+  }
+
   async getNode(id: Id): Promise<Node | null> {
     return this.nodes.get(id) ?? null
   }

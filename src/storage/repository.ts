@@ -8,6 +8,8 @@ export interface DataRoomRepository {
   deleteRoom(id: Id): Promise<void>
 
   listChildren(dataroomId: Id, parentId: Id | null): Promise<Node[]>
+  /** All nodes in a room (for outline / move targets). */
+  listRoomNodes(dataroomId: Id): Promise<Node[]>
   getNode(id: Id): Promise<Node | null>
   getBreadcrumbs(dataroomId: Id, folderId: Id | null): Promise<Node[]>
 
