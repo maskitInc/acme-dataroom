@@ -2,22 +2,28 @@
 
 | | |
 |--|--|
-| **Now** | Stage **10 / 10** — Ship (GH + Vercel) |
-| **Left** | Deploy hosted URL (needs Vercel auth if not logged in) |
-| **Progress** | 90% |
-| **Need from you** | **Vercel login** if deploy fails (`npx vercel login`). GH OK. Supabase not required. |
+| **Now** | Stage **10 / 10** — Done |
+| **Left** | nothing critical |
+| **Progress** | 100% |
+| **Need from you** | Nothing |
+
+## Links
+
+- **Live:** https://tailored-tech-test-gamma.vercel.app
+- **GitHub:** https://github.com/maskitInc/acme-dataroom
+- **Inspect:** https://vercel.com/maksyms-projects-d65b07f5/tailored-tech-test/5CDcDa71ps8WHZEF2Pc3gZiaknQw
 
 ## Stage log
 
 | Stage | Status | Note |
 |-------|--------|------|
-| 1 Plans | done | `docs/plans/*` |
-| 2 Scaffold | done | Vite+shadcn |
-| 3 Domain | done | tests pass |
+| 1 Plans | done | |
+| 2 Scaffold | done | |
+| 3 Domain | done | |
 | 4 Rooms | done | |
 | 5 Folders | done | |
 | 6 PDF | done | |
-| 7 Polish | done | seed + delete room |
-| 8 IDB | done | + memory fallback |
-| 9 Move | done | Move dialog (no DnD) |
-| 10 Ship | in progress | README written; GH/Vercel next |
+| 7 Polish | done | |
+| 8 IDB | done | |
+| 9 Move | done | |
+| 10 Ship | done | Vercel + GitHub |

@@ -1,6 +1,6 @@
 # Acme Virtual Data Room (MVP)
 
-**Live:** _(deploy URL will appear here after Vercel)_
+**Live:** https://tailored-tech-test-gamma.vercel.app
 
 ## Priorities
 

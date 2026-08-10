@@ -61,7 +61,8 @@
 - [ ] Optional dnd-kit only if dialog done
 
 ## Stage 10 — Ship
-- [ ] README §15 complete
-- [ ] Live Vercel URL in README
-- [ ] Smoke SPEC §17 Must steps
-- [ ] STATUS.md → 100%
+- [x] README §15 complete
+- [x] GitHub repo + push
+- [x] Live Vercel URL in README
+- [x] STATUS.md → 100%
+- [ ] Optional: smoke SPEC §17 on Live in browser
