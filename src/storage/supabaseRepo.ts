@@ -2,9 +2,10 @@ import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { collectDescendants, wouldCreateCycle } from '@/domain/cascade'
 import { uniqueName } from '@/domain/naming'
 import { extractPdfText } from '@/domain/pdfText'
-import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
+import type { DataRoom, Id, Node, SearchHit, UploadProgress } from '@/domain/types'
 import { parentKeyOf, ValidationError } from '@/domain/types'
 import { validatePdf } from '@/domain/validatePdf'
+import { uploadStorageObjectWithProgress } from '@/lib/storageUpload'
 import type { DataRoomRepository } from './repository'
 import { searchNodes } from './search'
 
@@ -238,7 +239,10 @@ export class SupabaseRepository implements DataRoomRepository {
     dataroomId: Id,
     parentId: Id | null,
     file: File,
+    onProgress?: (p: UploadProgress) => void,
   ): Promise<{ node: Node; renamedFrom?: string }> {
+    const report = onProgress ?? (() => {})
+    report({ phase: 'validate', percent: 2, label: 'Validating…' })
     const check = validatePdf(file)
     if (!check.ok) throw new ValidationError(check.reason)
     if (parentId) {
@@ -247,6 +251,7 @@ export class SupabaseRepository implements DataRoomRepository {
         throw new ValidationError('Invalid parent folder')
       }
     }
+    report({ phase: 'validate', percent: 5, label: 'Validating…' })
     const desired = file.name
     const finalName = uniqueName(desired, await this.siblingNames(dataroomId, parentId))
     const nodeId = crypto.randomUUID()
@@ -254,17 +259,62 @@ export class SupabaseRepository implements DataRoomRepository {
 
     let text = ''
     let hasTextIndex = false
+    report({ phase: 'extract', percent: 8, label: 'Indexing PDF text…' })
     try {
       text = await extractPdfText(file)
       hasTextIndex = text.trim().length > 0
     } catch {
       // best-effort
     }
+    report({ phase: 'extract', percent: 22, label: 'Indexing PDF text…' })
 
-    const { error: upErr } = await this.client.storage
-      .from('dataroom-files')
-      .upload(path, file, { contentType: 'application/pdf', upsert: false })
-    if (upErr) throwSb(upErr, 'Failed to upload PDF')
+    const {
+      data: { session },
+      error: sessionErr,
+    } = await this.client.auth.getSession()
+    if (sessionErr || !session?.access_token) {
+      throw new ValidationError('Not signed in')
+    }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+    const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string
+
+    report({
+      phase: 'store',
+      percent: 25,
+      bytesLoaded: 0,
+      bytesTotal: file.size,
+      label: 'Uploading…',
+    })
+
+    try {
+      await uploadStorageObjectWithProgress({
+        supabaseUrl,
+        apikey,
+        accessToken: session.access_token,
+        bucket: 'dataroom-files',
+        path,
+        file,
+        contentType: 'application/pdf',
+        onProgress: (loaded, total) => {
+          const ratio = total > 0 ? loaded / total : 0
+          const percent = Math.round(25 + ratio * 65)
+          report({
+            phase: 'store',
+            percent,
+            bytesLoaded: loaded,
+            bytesTotal: total,
+            label: 'Uploading…',
+          })
+        },
+      })
+    } catch (err) {
+      throw new ValidationError(
+        err instanceof Error ? err.message : 'Failed to upload PDF',
+      )
+    }
+
+    report({ phase: 'finalize', percent: 92, label: 'Saving metadata…' })
 
     const { data, error } = await this.client
       .from('nodes')
@@ -294,6 +344,7 @@ export class SupabaseRepository implements DataRoomRepository {
       if (textErr) console.warn('text index', textErr.message)
     }
 
+    report({ phase: 'finalize', percent: 100, label: 'Done' })
     return {
       node: mapNode(data as NodeRow),
       renamedFrom: finalName !== desired.trim() ? desired.trim() : undefined,

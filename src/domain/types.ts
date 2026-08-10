@@ -31,6 +31,18 @@ export interface SearchHit {
   snippet: string
 }
 
+/** Progress events for repository.uploadFile (UI must not talk to storage directly). */
+export type UploadPhase = 'validate' | 'extract' | 'store' | 'finalize'
+
+export interface UploadProgress {
+  phase: UploadPhase
+  /** Overall 0–100 */
+  percent: number
+  bytesLoaded?: number
+  bytesTotal?: number
+  label?: string
+}
+
 export const ROOT_KEY = 'root'
 
 export function parentKeyOf(parentId: Id | null): string {

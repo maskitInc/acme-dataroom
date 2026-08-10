@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 561 >>stream
+BT
+/F1 14 Tf
+72 760 Td
+(MASTER SERVICES AGREEMENT) Tj
+/F1 11 Tf
+0 -18 Td
+() Tj
+0 -18 Td
+(Provider: Acme Advisory LLP) Tj
+0 -18 Td
+(Client: Northwind Holdings) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Scope: legal diligence support for Series B.) Tj
+0 -18 Td
+(Fees: USD 18,500 retainer + hourly overages.) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Limitation of liability capped at fees paid in) Tj
+0 -18 Td
+(the preceding twelve months. Indemnification) Tj
+0 -18 Td
+(clause applies to third-party IP claims.) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Termination for convenience: 30 days notice.) Tj
+ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000111 00000 n 
+0000000233 00000 n 
+0000000843 00000 n 
+trailer<< /Size 6 /Root 1 0 R >>
+startxref
+911
+%%EOF

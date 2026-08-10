@@ -224,13 +224,14 @@ export function AppShell({
             toast.success(`Deleted “${name}”`)
           })
         }
-        onUpload={async (file) => {
+        onUpload={async (file, onProgress) => {
           if (!currentRoomId) return
           try {
             const { node, renamedFrom } = await repo.uploadFile(
               currentRoomId,
               currentParentId,
               file,
+              onProgress,
             )
             await refreshBrowser(currentRoomId, currentParentId)
             if (renamedFrom) {

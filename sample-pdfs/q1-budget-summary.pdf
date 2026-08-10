@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 505 >>stream
+BT
+/F1 14 Tf
+72 760 Td
+(Q1 2024 BUDGET SUMMARY) Tj
+/F1 11 Tf
+0 -18 Td
+() Tj
+0 -18 Td
+(Entity: Acme Corp Finance) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Revenue forecast: USD 2,450,000) Tj
+0 -18 Td
+(Operating expenses: USD 1,820,000) Tj
+0 -18 Td
+(EBITDA margin: 18.4%) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Capex: USD 210,000 \(equipment refresh\)) Tj
+0 -18 Td
+(Cash runway: 14 months at current burn.) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Notes: legal reserve increased by USD 75,000) Tj
+0 -18 Td
+(for pending contract disputes.) Tj
+ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000111 00000 n 
+0000000233 00000 n 
+0000000787 00000 n 
+trailer<< /Size 6 /Root 1 0 R >>
+startxref
+855
+%%EOF

@@ -2,7 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { collectDescendants, wouldCreateCycle } from '@/domain/cascade'
 import { uniqueName } from '@/domain/naming'
 import { extractPdfText } from '@/domain/pdfText'
-import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
+import type { DataRoom, Id, Node, SearchHit, UploadProgress } from '@/domain/types'
 import { parentKeyOf, ValidationError } from '@/domain/types'
 import { validatePdf } from '@/domain/validatePdf'
 import type { DataRoomRepository } from './repository'
@@ -214,7 +214,10 @@ export class IdbRepository implements DataRoomRepository {
     dataroomId: Id,
     parentId: Id | null,
     file: File,
+    onProgress?: (p: UploadProgress) => void,
   ): Promise<{ node: Node; renamedFrom?: string }> {
+    const report = onProgress ?? (() => {})
+    report({ phase: 'validate', percent: 2, label: 'Validating…' })
     const room = await this.db.get('datarooms', dataroomId)
     if (!room) throw new ValidationError('Room not found')
     const check = validatePdf(file)
@@ -225,6 +228,7 @@ export class IdbRepository implements DataRoomRepository {
         throw new ValidationError('Invalid parent folder')
       }
     }
+    report({ phase: 'validate', percent: 5, label: 'Validating…' })
     const desired = file.name
     const finalName = uniqueName(
       desired,
@@ -234,12 +238,14 @@ export class IdbRepository implements DataRoomRepository {
     const t = now()
     let text = ''
     let hasTextIndex = false
+    report({ phase: 'extract', percent: 10, label: 'Indexing PDF text…' })
     try {
       text = await extractPdfText(file)
       hasTextIndex = text.trim().length > 0
     } catch {
       // best-effort
     }
+    report({ phase: 'extract', percent: 35, label: 'Indexing PDF text…' })
     const node: Node = {
       id,
       dataroomId,
@@ -254,11 +260,26 @@ export class IdbRepository implements DataRoomRepository {
       createdAt: t,
       updatedAt: t,
     }
+    report({
+      phase: 'store',
+      percent: 50,
+      bytesLoaded: 0,
+      bytesTotal: file.size,
+      label: 'Saving locally…',
+    })
     const tx = this.db.transaction(['nodes', 'blobs', 'texts'], 'readwrite')
     await tx.objectStore('blobs').put({ id, blob: file })
     await tx.objectStore('nodes').put(node)
     if (hasTextIndex) await tx.objectStore('texts').put({ id, text })
     await tx.done
+    report({
+      phase: 'store',
+      percent: 90,
+      bytesLoaded: file.size,
+      bytesTotal: file.size,
+      label: 'Saving locally…',
+    })
+    report({ phase: 'finalize', percent: 100, label: 'Done' })
     return {
       node,
       renamedFrom: finalName !== desired.trim() ? desired.trim() : undefined,

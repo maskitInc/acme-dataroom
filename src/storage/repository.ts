@@ -1,4 +1,6 @@
-import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
+import type { DataRoom, Id, Node, SearchHit, UploadProgress } from '@/domain/types'
+
+export type UploadProgressHandler = (progress: UploadProgress) => void
 
 export interface DataRoomRepository {
   listRooms(): Promise<DataRoom[]>
@@ -21,6 +23,7 @@ export interface DataRoomRepository {
     dataroomId: Id,
     parentId: Id | null,
     file: File,
+    onProgress?: UploadProgressHandler,
   ): Promise<{ node: Node; renamedFrom?: string }>
   getFileBlob(id: Id): Promise<Blob>
   deleteFile(id: Id): Promise<void>

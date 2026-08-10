@@ -15,8 +15,13 @@ import {
   Search,
   Upload,
 } from 'lucide-react'
-import type { DataRoom, Id, Node, SearchHit } from '@/domain/types'
+import type { DataRoom, Id, Node, SearchHit, UploadProgress } from '@/domain/types'
 import { cn } from '@/lib/utils'
+import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
+  installWindowFileDropGuard,
+} from '@/lib/osFileDrop'
 import { Button } from '@/components/ui/button'
 import {
   Breadcrumb,
@@ -30,6 +35,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { NodeRow } from '@/components/browser/NodeRow'
 import { SearchHits } from '@/components/browser/SearchHits'
+import { UploadProgressBar } from '@/components/browser/UploadProgressBar'
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet'
 import {
   CreateFolderDialog,
@@ -70,7 +76,10 @@ export function RoomBrowser({
   onRename: (id: Id, name: string) => Promise<void>
   onDeleteFolder: (id: Id, name: string, n: number) => Promise<void>
   onDeleteFile: (id: Id, name: string) => Promise<void>
-  onUpload: (file: File) => Promise<void>
+  onUpload: (
+    file: File,
+    onProgress?: (p: UploadProgress) => void,
+  ) => Promise<void>
   onMove: (id: Id, newParentId: Id | null) => Promise<void>
   listAllFolders: () => Promise<Node[]>
   getFileBlob: (id: Id) => Promise<Blob>
@@ -78,6 +87,7 @@ export function RoomBrowser({
   countDescendants: (folderId: Id) => Promise<number>
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const dragDepth = useRef(0)
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [searching, setSearching] = useState(false)
@@ -85,6 +95,10 @@ export function RoomBrowser({
   const onSearchRef = useRef(onSearch)
   onSearchRef.current = onSearch
   const [fileDragOver, setFileDragOver] = useState(false)
+  const [uploadName, setUploadName] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
+    null,
+  )
   const [createOpen, setCreateOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [renameTarget, setRenameTarget] = useState<Node | null>(null)
@@ -107,6 +121,9 @@ export function RoomBrowser({
   )
 
   const searchingRoom = query.trim().length > 0
+  const uploading = uploadName != null
+
+  useEffect(() => installWindowFileDropGuard(), [])
 
   useEffect(() => {
     const q = query.trim()
@@ -143,6 +160,20 @@ export function RoomBrowser({
     }
   }, [previewUrl])
 
+  async function runUpload(file: File) {
+    if (uploading) {
+      toast.message('Wait for the current upload to finish')
+      return
+    }
+    setUploadName(file.name)
+    setUploadProgress({ phase: 'validate', percent: 0, label: 'Starting…' })
+    try {
+      await onUpload(file, (p) => setUploadProgress(p))
+    } finally {
+      setUploadName(null)
+      setUploadProgress(null)
+    }
+  }
   async function openPreview(node: Node) {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreview(node)
@@ -190,12 +221,42 @@ export function RoomBrowser({
     setFolders(all.filter((f) => f.id !== node.id))
   }
 
+  function clearFileDrag() {
+    dragDepth.current = 0
+    setFileDragOver(false)
+  }
+
+  function handleOsFileDragEnter(e: DragEvent) {
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    e.preventDefault()
+    e.stopPropagation()
+    dragDepth.current += 1
+    setFileDragOver(true)
+  }
+
+  function handleOsFileDragOver(e: DragEvent) {
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+    setFileDragOver(true)
+  }
+
+  function handleOsFileDragLeave(e: DragEvent) {
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    e.preventDefault()
+    e.stopPropagation()
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setFileDragOver(false)
+  }
+
   function handleOsFileDrop(e: DragEvent) {
     e.preventDefault()
-    setFileDragOver(false)
-    const file = e.dataTransfer.files?.[0]
+    e.stopPropagation()
+    clearFileDrag()
+    const file = filesFromDataTransfer(e.dataTransfer)[0]
     if (!file) return
-    void onUpload(file)
+    void runUpload(file)
   }
 
   function onDragStart(event: DragStartEvent) {
@@ -273,7 +334,7 @@ export function RoomBrowser({
         >
           <FolderPlus /> New folder
         </Button>
-        <Button onClick={() => fileRef.current?.click()}>
+        <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
           <Upload /> Upload PDF
         </Button>
         <div className="relative min-w-[12rem] flex-1">
@@ -291,32 +352,27 @@ export function RoomBrowser({
           type="file"
           accept="application/pdf,.pdf"
           className="hidden"
+          disabled={uploading}
           onChange={(e) => {
             const f = e.target.files?.[0]
             e.target.value = ''
-            if (f) void onUpload(f)
+            if (f) void runUpload(f)
           }}
         />
       </div>
 
+      {uploadName && uploadProgress && (
+        <UploadProgressBar fileName={uploadName} progress={uploadProgress} />
+      )}
+
       <div
         className={cn(
           'rounded-xl transition-colors',
-          fileDragOver && 'ring-2 ring-primary ring-offset-2',
+          fileDragOver && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
         )}
-        onDragEnter={(e) => {
-          if (e.dataTransfer.types.includes('Files')) {
-            e.preventDefault()
-            setFileDragOver(true)
-          }
-        }}
-        onDragOver={(e) => {
-          if (e.dataTransfer.types.includes('Files')) {
-            e.preventDefault()
-            setFileDragOver(true)
-          }
-        }}
-        onDragLeave={() => setFileDragOver(false)}
+        onDragEnter={handleOsFileDragEnter}
+        onDragOver={handleOsFileDragOver}
+        onDragLeave={handleOsFileDragLeave}
         onDrop={handleOsFileDrop}
       >
         {searchingRoom ? (
@@ -345,7 +401,7 @@ export function RoomBrowser({
               >
                 <FolderPlus /> New folder
               </Button>
-              <Button onClick={() => fileRef.current?.click()}>
+              <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
                 <Upload /> Upload PDF
               </Button>
             </div>

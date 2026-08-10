@@ -24,7 +24,7 @@ Granular UI: `rooms/`, `browser/` (RoomBrowser + NodeRow + SearchHits), `pdf/`, 
 - **PDF viewing:** blob object URLs in a sheet + Open in new tab / Download (mobile-friendly)
 - **Move:** “Move to…” dialog + drag handle (`@dnd-kit`, long-press on touch) onto folders
 - **Search:** room-wide name + PDF text (indexed on upload via pdf.js); UI goes through `repository.searchInRoom`
-- **Upload:** file picker or drop PDF onto the browser area
+- **Upload:** file picker or OS→browser drop (window guard so drop outside zone doesn’t navigate away); visible upload progress bar
 - **Cloud:** `SupabaseRepository` implements the same repository interface; Auth = email magic link
 - **Out of scope:** multi-type files, fine-grained share permissions, OAuth (easy to add later)
 
