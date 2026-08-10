@@ -50,7 +50,7 @@ Schema (already applied on the linked project): `supabase/migrations/`.
 3. Nest folders, upload PDFs, preview
 4. Search by filename or PDF content (room-wide)
 5. Drag items onto a folder or use Move to…
-6. Refresh — cloud data persists in Supabase; local mode uses IndexedDB
+6. Refresh — stay in the same room/folder (`?room=&folder=`); data persists (Supabase / IndexedDB)
 
 ## Plans & research
 
