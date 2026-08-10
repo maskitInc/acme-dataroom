@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   Download,
   ExternalLink,
@@ -6,15 +6,15 @@ import {
   Plus,
   RotateCcw,
   Hand,
+  XIcon,
 } from 'lucide-react'
 import type { Node } from '@/domain/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
+  SheetClose,
   SheetContent,
-  SheetFooter,
-  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
 
@@ -22,6 +22,7 @@ const MIN_ZOOM = 0.5
 const MAX_ZOOM = 3
 const ZOOM_STEP = 0.25
 const MAX_PAGES = 40
+const PAN_HINT_MS = 2200
 
 export function PdfPreviewSheet({
   preview,
@@ -38,7 +39,7 @@ export function PdfPreviewSheet({
   const [zoom, setZoom] = useState(1)
   const [renderError, setRenderError] = useState<string | null>(null)
   const [rendering, setRendering] = useState(false)
-  const [pageCount, setPageCount] = useState(0)
+  const [showPanHint, setShowPanHint] = useState(false)
   const [panning, setPanning] = useState(false)
   const panRef = useRef<{
     active: boolean
@@ -47,14 +48,29 @@ export function PdfPreviewSheet({
     left: number
     top: number
   } | null>(null)
+  const hintTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (!preview) {
       setZoom(1)
       setRenderError(null)
-      setPageCount(0)
+      setShowPanHint(false)
+      if (hintTimer.current) window.clearTimeout(hintTimer.current)
     }
   }, [preview])
+
+  useEffect(() => {
+    if (hintTimer.current) window.clearTimeout(hintTimer.current)
+    if (zoom === 1) {
+      setShowPanHint(false)
+      return
+    }
+    setShowPanHint(true)
+    hintTimer.current = window.setTimeout(() => setShowPanHint(false), PAN_HINT_MS)
+    return () => {
+      if (hintTimer.current) window.clearTimeout(hintTimer.current)
+    }
+  }, [zoom])
 
   useEffect(() => {
     if (!previewUrl || !viewportRef.current) return
@@ -77,7 +93,6 @@ export function PdfPreviewSheet({
         const pdf = await getDocument({ data: new Uint8Array(data) }).promise
         if (cancelled) return
         const pages = Math.min(pdf.numPages, MAX_PAGES)
-        setPageCount(pages)
 
         for (let i = 1; i <= pages; i++) {
           const page = await pdf.getPage(i)
@@ -113,7 +128,7 @@ export function PdfPreviewSheet({
     )
   }
 
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
     const el = viewportRef.current
     if (!el) return
@@ -126,9 +141,10 @@ export function PdfPreviewSheet({
       top: el.scrollTop,
     }
     setPanning(true)
+    setShowPanHint(false)
   }
 
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const pan = panRef.current
     const el = viewportRef.current
     if (!pan?.active || !el) return
@@ -136,7 +152,7 @@ export function PdfPreviewSheet({
     el.scrollTop = pan.top - (e.clientY - pan.y)
   }
 
-  function endPan(e: React.PointerEvent<HTMLDivElement>) {
+  function endPan(e: ReactPointerEvent<HTMLDivElement>) {
     if (!panRef.current?.active) return
     panRef.current = null
     setPanning(false)
@@ -148,6 +164,7 @@ export function PdfPreviewSheet({
   }
 
   const error = previewError || renderError
+  const zoomDirty = zoom !== 1
 
   return (
     <Sheet
@@ -157,108 +174,159 @@ export function PdfPreviewSheet({
       }}
     >
       <SheetContent
-        side="right"
-        className="inset-0 flex h-dvh w-full max-w-none flex-col gap-0 border-0 p-0 sm:max-w-none data-[side=right]:w-full"
+        side="bottom"
+        showCloseButton={false}
+        className={cn(
+          'gap-0 overflow-hidden border-0 bg-neutral-900 p-0 text-white shadow-2xl',
+          // Size: full width mobile; ~90% desktop; tall sheet
+          'w-full max-w-none rounded-t-2xl',
+          'data-[side=bottom]:inset-x-0 data-[side=bottom]:h-[100dvh]',
+          'sm:data-[side=bottom]:inset-x-[5%] sm:data-[side=bottom]:h-[90dvh]',
+          // Full slide up / down (default sheet only nudges 2.5rem)
+          'duration-300 ease-out',
+          'data-starting-style:opacity-100 data-ending-style:opacity-100',
+          'data-[side=bottom]:data-starting-style:translate-y-full',
+          'data-[side=bottom]:data-ending-style:translate-y-full',
+          'data-[side=bottom]:border-t-0',
+        )}
       >
-        <SheetHeader className="shrink-0 flex-row items-center gap-3 border-b pr-12">
-          <SheetTitle className="min-w-0 flex-1 truncate text-left">
-            {preview?.name}
-          </SheetTitle>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              aria-label="Zoom out"
-              disabled={zoom <= MIN_ZOOM}
-              onClick={() => bumpZoom(-ZOOM_STEP)}
-            >
-              <Minus />
-            </Button>
-            <span className="w-14 text-center text-xs tabular-nums text-muted-foreground">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              aria-label="Zoom in"
-              disabled={zoom >= MAX_ZOOM}
-              onClick={() => bumpZoom(ZOOM_STEP)}
-            >
-              <Plus />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Reset zoom"
-              onClick={() => setZoom(1)}
-            >
-              <RotateCcw />
-            </Button>
-          </div>
-        </SheetHeader>
+        <SheetTitle className="sr-only">{preview?.name ?? 'PDF preview'}</SheetTitle>
 
-        <div
-          ref={viewportRef}
-          className={cn(
-            'relative min-h-0 flex-1 touch-none overflow-auto bg-neutral-700 select-none',
-            panning ? 'cursor-grabbing' : 'cursor-grab',
-          )}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endPan}
-          onPointerCancel={endPan}
-          onPointerLeave={(e) => {
-            if (panRef.current?.active) endPan(e)
-          }}
-        >
-          {error && (
-            <p className="p-6 text-sm text-destructive">{error}</p>
-          )}
-          {!error && !previewUrl && (
-            <p className="p-6 text-muted-foreground">Loading…</p>
-          )}
-          {previewUrl && !error && (
-            <div
-              data-pdf-pages
-              className="flex min-h-full min-w-full flex-col items-center px-4 py-6"
-            />
-          )}
-          {rendering && (
-            <p className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow">
-              Rendering…
-            </p>
-          )}
-          {pageCount > 0 && zoom > 1 && (
-            <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-md bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow">
-              <Hand className="size-3.5" aria-hidden /> Drag to pan
-            </p>
-          )}
+        {/* Drag handle */}
+        <div className="flex shrink-0 justify-center pt-2 pb-1">
+          <div className="h-1 w-10 rounded-full bg-white/30" aria-hidden />
         </div>
 
-        <SheetFooter className="shrink-0 flex-row gap-2 border-t sm:justify-start">
-          <Button
-            variant="outline"
-            disabled={!previewUrl}
-            onClick={() => {
-              if (previewUrl) window.open(previewUrl, '_blank')
-            }}
+        <div className="relative min-h-0 flex-1">
+          {/* Scroll + pan viewport */}
+          <div
+            ref={viewportRef}
+            className={cn(
+              'absolute inset-0 touch-none overflow-auto bg-neutral-800 select-none',
+              panning ? 'cursor-grabbing' : 'cursor-grab',
+            )}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}
           >
-            <ExternalLink /> Open in new tab
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!previewUrl || !preview}
-            onClick={() => {
-              if (!previewUrl || !preview) return
-              const a = document.createElement('a')
-              a.href = previewUrl
-              a.download = preview.name
-              a.click()
-            }}
-          >
-            <Download /> Download
-          </Button>
-        </SheetFooter>
+            {error && (
+              <p className="p-6 text-sm text-red-300">{error}</p>
+            )}
+            {!error && !previewUrl && (
+              <p className="p-6 text-white/60">Loading…</p>
+            )}
+            {previewUrl && !error && (
+              <div
+                data-pdf-pages
+                className="flex min-h-full min-w-full flex-col items-center px-4 py-16"
+              />
+            )}
+          </div>
+
+          {/* Overlay HUD — classic PDF chrome */}
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
+            <div className="flex items-start justify-between gap-2 p-3">
+              <p className="pointer-events-none max-w-[40%] truncate rounded-md bg-black/55 px-2.5 py-1.5 text-xs text-white/90 backdrop-blur-sm">
+                {preview?.name}
+              </p>
+
+              <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-black/55 p-1 shadow-lg backdrop-blur-md">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-white hover:bg-white/15 hover:text-white"
+                  aria-label="Zoom out"
+                  disabled={zoom <= MIN_ZOOM}
+                  onClick={() => bumpZoom(-ZOOM_STEP)}
+                >
+                  <Minus className="size-4" />
+                </Button>
+                <span className="min-w-12 px-1 text-center text-xs font-medium tabular-nums text-white">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-white hover:bg-white/15 hover:text-white"
+                  aria-label="Zoom in"
+                  disabled={zoom >= MAX_ZOOM}
+                  onClick={() => bumpZoom(ZOOM_STEP)}
+                >
+                  <Plus className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn(
+                    'text-white hover:bg-white/15 hover:text-white',
+                    !zoomDirty && 'opacity-35',
+                  )}
+                  aria-label="Reset zoom"
+                  disabled={!zoomDirty}
+                  onClick={() => setZoom(1)}
+                >
+                  <RotateCcw className="size-4" />
+                </Button>
+              </div>
+
+              <SheetClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="pointer-events-auto bg-black/55 text-white hover:bg-white/15 hover:text-white"
+                    aria-label="Close"
+                  />
+                }
+              >
+                <XIcon className="size-4" />
+              </SheetClose>
+            </div>
+
+            {rendering && (
+              <p className="mx-auto rounded-md bg-black/55 px-3 py-1 text-xs text-white/80 backdrop-blur-sm">
+                Rendering…
+              </p>
+            )}
+
+            <div className="mt-auto flex flex-col items-center gap-3 p-3 pb-4">
+              {showPanHint && (
+                <p className="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white/90 backdrop-blur-sm transition-opacity">
+                  <Hand className="size-3.5" aria-hidden /> Drag to pan
+                </p>
+              )}
+              <div className="pointer-events-auto flex flex-wrap justify-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="bg-black/55 text-white hover:bg-black/70"
+                  disabled={!previewUrl}
+                  onClick={() => {
+                    if (previewUrl) window.open(previewUrl, '_blank')
+                  }}
+                >
+                  <ExternalLink /> Open in new tab
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="bg-black/55 text-white hover:bg-black/70"
+                  disabled={!previewUrl || !preview}
+                  onClick={() => {
+                    if (!previewUrl || !preview) return
+                    const a = document.createElement('a')
+                    a.href = previewUrl
+                    a.download = preview.name
+                    a.click()
+                  }}
+                >
+                  <Download /> Download
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
   )
