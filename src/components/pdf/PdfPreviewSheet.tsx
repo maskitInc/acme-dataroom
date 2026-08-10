@@ -8,6 +8,7 @@ import {
   Hand,
   XIcon,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Node } from '@/domain/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,39 @@ const MAX_ZOOM = 3
 const ZOOM_STEP = 0.25
 const MAX_PAGES = 40
 const PAN_HINT_MS = 2200
+
+/** Open PDF blob in a new tab (sync blank window keeps user gesture / avoids blockers). */
+async function openPdfInNewTab(previewUrl: string) {
+  const win = window.open('about:blank', '_blank')
+  try {
+    const raw = await fetch(previewUrl).then((r) => {
+      if (!r.ok) throw new Error('fetch failed')
+      return r.blob()
+    })
+    const pdf =
+      raw.type === 'application/pdf'
+        ? raw
+        : new Blob([raw], { type: 'application/pdf' })
+    const url = URL.createObjectURL(pdf)
+    if (win) {
+      win.opener = null
+      win.location.replace(url)
+    } else {
+      const a = document.createElement('a')
+      a.href = url
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+    // Own URL — survives sheet close / revoke of previewUrl
+    window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+  } catch {
+    win?.close()
+    toast.error('Could not open PDF in a new tab')
+  }
+}
 
 export function PdfPreviewSheet({
   preview,
@@ -301,7 +335,7 @@ export function PdfPreviewSheet({
                   className="bg-black/55 text-white hover:bg-black/70"
                   disabled={!previewUrl}
                   onClick={() => {
-                    if (previewUrl) window.open(previewUrl, '_blank')
+                    if (previewUrl) void openPdfInNewTab(previewUrl)
                   }}
                 >
                   <ExternalLink /> Open in new tab

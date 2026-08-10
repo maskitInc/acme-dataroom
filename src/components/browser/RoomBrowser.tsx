@@ -188,7 +188,12 @@ export function RoomBrowser({
     setPreviewUrl(null)
     try {
       const blob = await getFileBlob(node.id)
-      setPreviewUrl(URL.createObjectURL(blob))
+      // Browsers only render PDF viewer for application/pdf (Storage often returns octet-stream)
+      const pdf =
+        blob.type === 'application/pdf'
+          ? blob
+          : new Blob([blob], { type: 'application/pdf' })
+      setPreviewUrl(URL.createObjectURL(pdf))
     } catch {
       setPreviewError('Could not load PDF')
     }
