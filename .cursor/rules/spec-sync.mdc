@@ -1,0 +1,27 @@
+---
+description: When SPEC or research docs change — sync ADR/DoD first, then slices/components
+globs: docs/SPEC.md,docs/research/**/*.md,docs/test-task.md
+alwaysApply: false
+---
+
+# Spec / research sync order
+
+If `docs/test-task.md`, `docs/SPEC.md`, or KB files change:
+
+## Sync order (mandatory)
+
+1. **`docs/research/07d-impl-kb-adr-dod.md`** — update ADR decisions + Must DoD checkboxes  
+2. **`docs/research/07c-impl-kb-slices.md`** — adjust slice exit/gates if scope moved  
+3. **`docs/research/07a-…` / `07b-…`** — only sections touched by the change  
+4. **`docs/research/07-implementation-kb-overview.md`** — traceability rows if IDs changed  
+5. **`docs/research/03-decisions.md`** + **`docs/research/README.md`** — one-line pointers if needed  
+
+Do **not** rewrite architecture report (`02-…`) unless the locked stack changes.
+
+## Conflict rule
+
+`test-task.md` (TQ) wins → then SPEC → then ADR → then other KB prose.
+
+## After sync
+
+Note the change in ADR file under a short “Changelog” bullet (date + what flipped).

@@ -1,0 +1,36 @@
+---
+description: Acme Data Room MVP — locked stack, TQ priorities, kill switches, scope
+alwaysApply: true
+---
+
+# Data Room MVP (tailored-tech-test)
+
+Take-home Virtual Data Room. Optimize **UX → polish → code**. Timebox ~4–6h.
+
+## Locked (do not reopen)
+
+- **SPA:** Vite + React + TypeScript + Tailwind + shadcn/ui (not Next)
+- **Persist:** IndexedDB via `DataRoomRepository` (Memory first, then Idb). No cloud/auth as Must
+- **Files:** PDF only; object URL preview (no pdf.js unless iframe fails)
+- **Move:** dialog first; `@dnd-kit` only after dialog works
+
+## Non-negotiable
+
+- No unimplemented UI (no Share/Auth/Search stubs)
+- UI talks only to repository interface — never IDB directly from components
+- Same-name → auto-suffix ` (n)`; folder delete = cascade + confirm with N
+- TQ (`docs/test-task.md`) > SPEC > ADR/KB
+
+## Kill switches
+
+1. DnD broken → Move dialog only  
+2. IDB pain → Memory + README note  
+3. After ~5h → README + deploy only  
+4. Extra = filename search **XOR** Supabase — not both  
+
+## Docs map
+
+- Spec: `docs/SPEC.md`
+- Slice runbooks: `docs/research/07c-impl-kb-slices.md`
+- ADR/DoD: `docs/research/07d-impl-kb-adr-dod.md`
+- KB index: `docs/research/07-implementation-kb.md`

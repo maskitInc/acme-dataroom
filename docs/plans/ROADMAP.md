@@ -1,0 +1,45 @@
+# Roadmap — concrete implementation
+
+```mermaid
+flowchart LR
+  P[1 Plans] --> S0[2 Scaffold]
+  S0 --> S1[3 Domain]
+  S1 --> S2[4 Rooms]
+  S2 --> S3[5 Folders]
+  S3 --> S4[6 PDF]
+  S4 --> S5[7 Polish]
+  S5 --> S6[8 IDB]
+  S6 --> S7[9 Move]
+  S7 --> S8[10 Ship]
+  S2 -.-> V[Vercel+GH parallel]
+  V --> S8
+```
+
+| # | Етап | Вихід (done when) | Est. | Access |
+|---|------|-------------------|------|--------|
+| 1 | Plans + checklists | `docs/plans/*` | 15m | — |
+| 2 | Slice 0 Scaffold | `npm run build` OK, App shell | 30m | — |
+| 3 | Slice 1 Domain+Memory | unit/smoke naming+cascade | 30m | — |
+| 4 | Slice 2 Rooms UI | create/list/open rooms | 25m | GH (repo) |
+| 5 | Slice 3 Folders | nest/rename/cascade UI | 50m | — |
+| 6 | Slice 4 PDF | upload/view/rename/delete + `(n)` | 45m | — |
+| 7 | Slice 5 Polish/seed | empty states, seed, delete room | 25m | — |
+| 8 | Slice 6 IndexedDB | persist across refresh | 35m | — |
+| 9 | Slice 7 Move dialog (±DnD) | move without cycles | 40m | — |
+| 10 | Slice 8 README + deploy | Live URL + README | 40m | **Vercel** |
+
+**Total stages: 10.** Supabase = optional Extra after stage 10 — **не блокує** MVP.
+
+## Parallel track (з етапу 4)
+
+- `git init` / commit  
+- `gh repo create`  
+- Vercel project link + deploy preview/prod  
+
+## Kill switches (не змінюють номер етапу)
+
+| Trigger | Action |
+|---------|--------|
+| DnD fails | Ship Move dialog only |
+| IDB fails | Memory + README banner |
+| Time overrun | Skip Should/Extra; jump to stage 10 |

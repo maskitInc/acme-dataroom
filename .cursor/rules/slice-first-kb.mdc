@@ -1,0 +1,29 @@
+---
+description: Slice-first workflow — read only current slice KB, not entire research dump
+alwaysApply: true
+---
+
+# Slice-first workflow
+
+KB is ~1k+ lines across `docs/research/07*`. **Do not load all of it** each turn.
+
+## Before coding a slice
+
+Read **only**:
+
+1. `docs/research/07d-impl-kb-adr-dod.md` — ADR defaults (skim)
+2. **Current slice** section in `docs/research/07c-impl-kb-slices.md`
+3. If domain/repo work → matching cards in `07a-impl-kb-domain-persistence.md`
+4. If UI work → **only** components for that slice in `07b-impl-kb-components.md`
+
+Skip `02-deep-research-report.md` / full SPEC unless resolving a conflict.
+
+## Build order (binding)
+
+`0 scaffold → 1 domain/memory → 2 rooms (+Vercel) → 3 folders → 4 PDF → 5 polish/seed → 6 IDB → 7 Move(±DnD) → 8 README/ship`
+
+Finish exit criteria + DoD for the active slice before starting the next.
+
+## Agent prompts
+
+Use Package A–G stubs in `07c-impl-kb-slices.md` — one package per turn, not “build entire app”.

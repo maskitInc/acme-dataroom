@@ -1,0 +1,32 @@
+---
+description: App code conventions — repository pattern, domain purity, no dead UI
+globs: src/**/*.{ts,tsx},src/**/*.css,index.html,vite.config.*
+alwaysApply: false
+---
+
+# App implementation conventions
+
+## Layers
+
+```
+components → DataRoomRepository → MemoryRepository | IdbRepository
+domain/* = pure functions (no React, no IDB)
+```
+
+## Do
+
+- Granular components per `docs/research/07b-impl-kb-components.md`
+- Toast on auto-rename; confirm cascade delete with N
+- `revokeObjectURL` when closing PDF preview
+- PDF: `accept` + validate; max 20MB
+
+## Don't
+
+- Import `idb` from UI components
+- Add Auth, Share, Permissions, content search, non-PDF types
+- Ship kebab/menu items that no-op
+- Install dnd-kit before Move dialog works
+
+## Persistence
+
+Bootstrap: try Idb → on failure Memory + degraded banner (ADR-09).
