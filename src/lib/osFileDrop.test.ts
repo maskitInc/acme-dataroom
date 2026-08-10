@@ -10,6 +10,7 @@ function fakeDt(partial: {
     types: partial.types ?? [],
     items: (partial.items ?? []) as unknown as DataTransferItemList,
     files: (partial.files ?? []) as unknown as FileList,
+    dropEffect: 'none',
   } as unknown as DataTransfer
 }
 

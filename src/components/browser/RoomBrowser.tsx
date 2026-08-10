@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -17,11 +17,7 @@ import {
 } from 'lucide-react'
 import type { DataRoom, Id, Node, SearchHit, UploadProgress } from '@/domain/types'
 import { cn } from '@/lib/utils'
-import {
-  dataTransferHasFiles,
-  filesFromDataTransfer,
-  installWindowFileDropGuard,
-} from '@/lib/osFileDrop'
+import { subscribeWindowOsFileDrop } from '@/lib/osFileDrop'
 import { Button } from '@/components/ui/button'
 import {
   Breadcrumb,
@@ -36,6 +32,7 @@ import { toast } from 'sonner'
 import { NodeRow } from '@/components/browser/NodeRow'
 import { SearchHits } from '@/components/browser/SearchHits'
 import { UploadProgressBar } from '@/components/browser/UploadProgressBar'
+import { FileDropOverlay } from '@/components/browser/FileDropOverlay'
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet'
 import {
   CreateFolderDialog,
@@ -87,14 +84,14 @@ export function RoomBrowser({
   countDescendants: (folderId: Id) => Promise<number>
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const dragDepth = useRef(0)
+  const runUploadRef = useRef<(file: File) => Promise<void>>(async () => {})
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [searching, setSearching] = useState(false)
   const searchGen = useRef(0)
   const onSearchRef = useRef(onSearch)
   onSearchRef.current = onSearch
-  const [fileDragOver, setFileDragOver] = useState(false)
+  const [fileDragActive, setFileDragActive] = useState(false)
   const [uploadName, setUploadName] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
     null,
@@ -123,7 +120,32 @@ export function RoomBrowser({
   const searchingRoom = query.trim().length > 0
   const uploading = uploadName != null
 
-  useEffect(() => installWindowFileDropGuard(), [])
+  async function runUpload(file: File) {
+    if (uploadName != null) {
+      toast.message('Wait for the current upload to finish')
+      return
+    }
+    setUploadName(file.name)
+    setUploadProgress({ phase: 'validate', percent: 0, label: 'Starting…' })
+    try {
+      await onUpload(file, (p) => setUploadProgress(p))
+    } finally {
+      setUploadName(null)
+      setUploadProgress(null)
+    }
+  }
+  runUploadRef.current = runUpload
+
+  useEffect(() => {
+    return subscribeWindowOsFileDrop({
+      onActiveChange: setFileDragActive,
+      onDrop: (files) => {
+        const file = files[0]
+        if (!file) return
+        void runUploadRef.current(file)
+      },
+    })
+  }, [])
 
   useEffect(() => {
     const q = query.trim()
@@ -159,21 +181,6 @@ export function RoomBrowser({
       if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
   }, [previewUrl])
-
-  async function runUpload(file: File) {
-    if (uploading) {
-      toast.message('Wait for the current upload to finish')
-      return
-    }
-    setUploadName(file.name)
-    setUploadProgress({ phase: 'validate', percent: 0, label: 'Starting…' })
-    try {
-      await onUpload(file, (p) => setUploadProgress(p))
-    } finally {
-      setUploadName(null)
-      setUploadProgress(null)
-    }
-  }
   async function openPreview(node: Node) {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreview(node)
@@ -221,44 +228,6 @@ export function RoomBrowser({
     setFolders(all.filter((f) => f.id !== node.id))
   }
 
-  function clearFileDrag() {
-    dragDepth.current = 0
-    setFileDragOver(false)
-  }
-
-  function handleOsFileDragEnter(e: DragEvent) {
-    if (!dataTransferHasFiles(e.dataTransfer)) return
-    e.preventDefault()
-    e.stopPropagation()
-    dragDepth.current += 1
-    setFileDragOver(true)
-  }
-
-  function handleOsFileDragOver(e: DragEvent) {
-    if (!dataTransferHasFiles(e.dataTransfer)) return
-    e.preventDefault()
-    e.stopPropagation()
-    e.dataTransfer.dropEffect = 'copy'
-    setFileDragOver(true)
-  }
-
-  function handleOsFileDragLeave(e: DragEvent) {
-    if (!dataTransferHasFiles(e.dataTransfer)) return
-    e.preventDefault()
-    e.stopPropagation()
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) setFileDragOver(false)
-  }
-
-  function handleOsFileDrop(e: DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    clearFileDrag()
-    const file = filesFromDataTransfer(e.dataTransfer)[0]
-    if (!file) return
-    void runUpload(file)
-  }
-
   function onDragStart(event: DragStartEvent) {
     const node = event.active.data.current?.node as Node | undefined
     setActiveDrag(node ?? null)
@@ -280,7 +249,15 @@ export function RoomBrowser({
   }
 
   return (
-    <div className="flex flex-col gap-4 text-left">
+    <div className="relative flex flex-col gap-4 text-left">
+      <FileDropOverlay
+        active={fileDragActive && !uploading}
+        folderHint={
+          crumbs.length > 0
+            ? `“${crumbs[crumbs.length - 1]!.name}”`
+            : 'the room root'
+        }
+      />
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon-sm" onClick={onBackHome} aria-label="All rooms">
           <ArrowLeft />
@@ -368,12 +345,8 @@ export function RoomBrowser({
       <div
         className={cn(
           'rounded-xl transition-colors',
-          fileDragOver && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
+          fileDragActive && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
         )}
-        onDragEnter={handleOsFileDragEnter}
-        onDragOver={handleOsFileDragOver}
-        onDragLeave={handleOsFileDragLeave}
-        onDrop={handleOsFileDrop}
       >
         {searchingRoom ? (
           <SearchHits
@@ -386,10 +359,11 @@ export function RoomBrowser({
         ) : loading ? (
           <p className="p-4 text-muted-foreground">Loading…</p>
         ) : children.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8">
+          <div className="rounded-xl border border-dashed border-muted-foreground/40 p-8">
             <p className="font-medium text-foreground">This folder is empty</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Create a nested folder, upload a PDF, or drop a PDF here.
+              Create a nested folder, upload a PDF, or drag a PDF anywhere onto
+              this window.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
@@ -446,9 +420,6 @@ export function RoomBrowser({
               ) : null}
             </DragOverlay>
           </DndContext>
-        )}
-        {fileDragOver && (
-          <p className="mt-2 text-center text-sm text-primary">Drop PDF to upload</p>
         )}
       </div>
 

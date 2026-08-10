@@ -1,78 +1,65 @@
-# Cross-browser OS → browser file drop + upload progress
+# File drag-and-drop UX — best practices (OS → browser)
 
-**Date:** 2026-08-10  
-**Scope:** Acme Data Room (Vite/React) — desktop OS file drop into the room browser, visible upload progress (IndexedDB + Supabase).
+**Date:** 2026-08-10 (rev 2)  
+**Goal:** Acme Data Room feels like Drive/Dropbox when dragging a PDF from the OS into the app.
 
-## 1) OS file drop (cross-browser)
+## Product pattern (what users expect)
 
-### Required API behaviour ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop))
+| Moment | Expected feedback |
+|--------|-------------------|
+| File dragged **over the browser window** | App reacts immediately — dimmed fullscreen overlay, clear “Drop PDF to upload” |
+| Pointer moves around children | Overlay **does not flicker** |
+| Drop **anywhere** in the room view | File accepted into **current folder** |
+| Drop outside / cancel | Overlay gone; browser must **not** navigate to the PDF |
+| Wrong type (`.docx`) | Reject with toast; overlay still closes |
+| Mobile / no DnD | Visible **Upload** button / file picker remains primary |
 
-| Event | Must | Why |
-|-------|------|-----|
-| `dragover` | `preventDefault()` | Without it, browser **never fires `drop`** |
-| `drop` | `preventDefault()` | Without it, browser **navigates** / opens the PDF in the tab |
-| `dragenter` / `dragleave` | UI only | Highlight zone; **not** used to enable drop |
+References: Drive, Dropbox, Slack, Gmail attach; Nielsen Norman — dashed border = droppable cue; MDN File drag and drop.
 
-### Quirks we hit in practice
+## Technical best practices
 
-1. **Window vs zone:** Drop outside the zone still opens the file as a page. Fix: document/window `dragover` + `drop` → `preventDefault()` when `DataTransferItem.kind === 'file'` (MDN pattern).
-2. **`dragleave` flicker:** Leaving a child node inside the zone fires `dragleave` on the parent (Chrome/Safari). Fix: **enter/leave counter** (increment on enter, decrement on leave; clear highlight only at 0).
-3. **Type sniffing:** Prefer `dataTransfer.items` (`kind === 'file'`) over `types.includes('Files')`. Firefox may also expose `application/x-moz-file`. Safari is more reliable with `items`.
-4. **`dropEffect`:** On `dragover` set `dataTransfer.dropEffect = 'copy'` so cursor matches “add file”.
-5. **Mobile:** HTML5 DnD from OS **does not work** on iOS/Android. Always keep `<input type="file">` (already present).
-6. **Conflict with in-app DnD (`@dnd-kit`):** Internal moves do not put `Files` in `dataTransfer`. Gate OS highlight/handlers on file-kind detection so folder moves stay unaffected.
-7. **`dragstart`/`dragend`:** Not fired for OS → browser drags. Cannot customize drag image for OS files.
+1. **Window/document listeners, not a tiny box**  
+   Small list-only zones fail UX and miss drops on chrome (header, gaps). Full-window target + overlay is the industry default.
 
-### Acceptance checklist
+2. **Always `preventDefault` on `dragover` + `drop`**  
+   Otherwise `drop` never fires / browser opens the file as a document.
 
-- [ ] Chrome / Edge / Firefox / Safari desktop: drop PDF into zone uploads; drop outside does **not** navigate away
-- [ ] Highlight stable while pointer moves over children
-- [ ] Non-PDF rejected with toast (existing `validatePdf`)
-- [ ] Mobile: Upload button / file picker still works
+3. **Enter/leave depth counter**  
+   Crossing child nodes fires leave→enter; only hide overlay when depth hits 0. Alternative: overlay children `pointer-events: none`.
 
-## 2) Upload progress
+4. **Listen in capture phase** when in-app DnD libs exist (`@dnd-kit`)  
+   Bubble-phase handlers can lose to libraries that call `stopPropagation`. Capture on `window` wins for OS files.
 
-### Reality
+5. **Detect files via `types` + `items`**  
+   Chrome: `Files`; Firefox: also `application/x-moz-file`; Safari: `DOMStringList.contains('Files')` / `items.kind === 'file'`. Be permissive during `dragenter` (types sometimes sparse).
 
-- **`fetch` / supabase-js `storage.upload()`** do **not** expose byte progress.
-- Options: (a) **XMLHttpRequest** `xhr.upload.onprogress` against Storage REST, (b) **TUS resumable** (`tus-js-client` / Uppy) — overkill for ≤50 MB PDFs.
+6. **`dropEffect = 'copy'`** on valid hover — OS cursor shows “copy/add”.
 
-### Chosen approach (TQ / minimal)
+7. **Idle empty state** still shows dashed “drop here” hint even without an active drag (affordance).
 
-| Backend | Progress source |
-|---------|-----------------|
-| Supabase Storage | XHR POST to `/storage/v1/object/{bucket}/{path}` + session Bearer + publishable `apikey` |
-| IndexedDB / Memory | Synthetic phase progress: validate → extract text → write blob → finalize |
+8. **Do not rely on `dragstart`/`dragend` for OS files** — they do not fire. Use enter/leave/over/drop only.
 
-Overall UI percent maps phases into 0–100 so users always see motion even when extract dominates time on small files.
+9. **Progress after drop** — separate concern; show upload bar immediately after accept.
 
-```
-validate  0–5%
-extract   5–25%   (or 5–40% local)
-store    25–90%   (real bytes on cloud; synthetic local)
-finalize 90–100%
-```
+10. **Accessibility** — overlay is decorative (`aria-hidden` or `role="status"`); keep keyboard path via Upload button.
 
-### Repository contract
+## Failure modes we hit (rev 1)
 
-```ts
-uploadFile(roomId, parentId, file, onProgress?: (p: UploadProgress) => void)
-```
+- Drop zone only wrapped the node list → easy to miss; no “window knows I’m dragging”.
+- Window guard `preventDefault`’d drops outside zone → file swallowed, no upload.
+- Possible competition with `@dnd-kit` in bubble phase.
 
-UI must not talk to Storage/IDB directly — only via repository (existing TQ rule).
+## Fix (rev 2)
 
-## 3) Implementation map (this PR)
+- `subscribeWindowOsFileDrop` — capture-phase window enter/over/leave/drop + depth counter  
+- `FileDropOverlay` — fullscreen “Drop PDF to upload into this folder”  
+- Drop anywhere while RoomBrowser mounted → `runUpload`  
+- Idle empty state keeps dashed affordance  
 
-- `docs/research/08-cross-browser-file-drop-upload-progress.md` — this note
-- `src/lib/osFileDrop.ts` — file-kind detection helpers
-- `src/domain/types.ts` — `UploadProgress`
-- `src/storage/*Repo.ts` — `onProgress` + Supabase XHR upload
-- `src/components/browser/UploadProgressBar.tsx` + `RoomBrowser` drop hardening
-- `AppShell` — pass progress callback into upload
+## Checklist
 
-## References
-
-- [MDN: File drag and drop](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop)
-- [MDN: Drag operations](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_operations)
-- [Supabase resumable uploads (TUS)](https://supabase.com/docs/guides/storage/uploads/resumable-uploads)
-- [supabase/storage-api#23](https://github.com/supabase/storage-api/issues/23) — XHR progress pattern
+- [ ] Chrome / Firefox / Safari / Edge desktop: drag PDF over window → overlay  
+- [ ] Drop anywhere → upload + progress  
+- [ ] Escape / leave window → overlay clears  
+- [ ] In-app folder DnD still works  
+- [ ] Mobile: Upload button works  

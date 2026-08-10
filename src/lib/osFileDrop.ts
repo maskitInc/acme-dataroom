@@ -1,10 +1,31 @@
 /** Detect OS → browser file drags across Chrome / Firefox / Safari / Edge. */
 
+function typesList(dt: DataTransfer): string[] {
+  const types = dt.types
+  if (!types) return []
+  const out: string[] = []
+  for (let i = 0; i < types.length; i++) out.push(types[i]!)
+  // Safari legacy DOMStringList
+  const list = types as unknown as { contains?: (v: string) => boolean }
+  if (typeof list.contains === 'function' && list.contains('Files') && !out.includes('Files')) {
+    out.push('Files')
+  }
+  return out
+}
+
 export function dataTransferHasFiles(dt: DataTransfer | null | undefined): boolean {
   if (!dt) return false
-  if (dt.types) {
-    for (const t of dt.types) {
-      if (t === 'Files' || t === 'application/x-moz-file') return true
+  for (const t of typesList(dt)) {
+    if (
+      t === 'Files' ||
+      t === 'application/x-moz-file' ||
+      t === 'public.file-url' ||
+      t.startsWith('application/')
+    ) {
+      // application/* alone is weak; only trust known file markers + items below
+      if (t === 'Files' || t === 'application/x-moz-file' || t === 'public.file-url') {
+        return true
+      }
     }
   }
   if (dt.items?.length) {
@@ -12,7 +33,7 @@ export function dataTransferHasFiles(dt: DataTransfer | null | undefined): boole
       if (item.kind === 'file') return true
     }
   }
-  return dt.files?.length > 0
+  return (dt.files?.length ?? 0) > 0
 }
 
 export function filesFromDataTransfer(dt: DataTransfer): File[] {
@@ -29,18 +50,70 @@ export function filesFromDataTransfer(dt: DataTransfer): File[] {
   return out
 }
 
-/** Block browser from navigating when a file is dropped outside the dropzone. */
-export function installWindowFileDropGuard(): () => void {
-  const onDragOver = (e: DragEvent) => {
-    if (dataTransferHasFiles(e.dataTransfer)) e.preventDefault()
+export type OsFileDropHandlers = {
+  onActiveChange: (active: boolean) => void
+  onDrop: (files: File[]) => void
+}
+
+/**
+ * Window-level OS file drop (Drive/Dropbox pattern).
+ * Uses capture phase so in-app DnD libs (@dnd-kit) cannot swallow the drop.
+ */
+export function subscribeWindowOsFileDrop(handlers: OsFileDropHandlers): () => void {
+  let depth = 0
+
+  const reset = () => {
+    depth = 0
+    handlers.onActiveChange(false)
   }
+
+  const onEnter = (e: DragEvent) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    e.preventDefault()
+    depth += 1
+    if (depth === 1) handlers.onActiveChange(true)
+  }
+
+  const onOver = (e: DragEvent) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    e.preventDefault()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onLeave = (e: DragEvent) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    // When leaving the document, relatedTarget is often null
+    depth = Math.max(0, depth - 1)
+    if (depth === 0) handlers.onActiveChange(false)
+    // Ignore unused e — kept for signature parity / future relatedTarget checks
+    void e
+  }
+
   const onDrop = (e: DragEvent) => {
-    if (dataTransferHasFiles(e.dataTransfer)) e.preventDefault()
+    if (!dataTransferHasFiles(e.dataTransfer)) return
+    e.preventDefault()
+    e.stopPropagation()
+    const dt = e.dataTransfer
+    if (!dt) {
+      reset()
+      return
+    }
+    const files = filesFromDataTransfer(dt)
+    reset()
+    if (files.length) handlers.onDrop(files)
   }
-  window.addEventListener('dragover', onDragOver)
-  window.addEventListener('drop', onDrop)
+
+  // Capture = before React / @dnd-kit bubble handlers
+  window.addEventListener('dragenter', onEnter, true)
+  window.addEventListener('dragover', onOver, true)
+  window.addEventListener('dragleave', onLeave, true)
+  window.addEventListener('drop', onDrop, true)
+
   return () => {
-    window.removeEventListener('dragover', onDragOver)
-    window.removeEventListener('drop', onDrop)
+    window.removeEventListener('dragenter', onEnter, true)
+    window.removeEventListener('dragover', onOver, true)
+    window.removeEventListener('dragleave', onLeave, true)
+    window.removeEventListener('drop', onDrop, true)
+    reset()
   }
 }
