@@ -221,12 +221,13 @@ export function PdfPreviewSheet({
 
           {/* Overlay HUD — classic PDF chrome */}
           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
-            <div className="flex items-start justify-between gap-2 p-3">
-              <p className="pointer-events-none max-w-[40%] truncate rounded-md bg-black/55 px-2.5 py-1.5 text-xs text-white/90 backdrop-blur-sm">
+            <div className="relative flex items-start justify-between gap-2 p-3">
+              <p className="pointer-events-none z-10 max-w-[min(40%,12rem)] truncate rounded-md bg-black/55 px-2.5 py-1.5 text-xs text-white/90 backdrop-blur-sm">
                 {preview?.name}
               </p>
 
-              <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-black/55 p-1 shadow-lg backdrop-blur-md">
+              {/* True horizontal center (not justify-between middle) */}
+              <div className="pointer-events-auto absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 p-1 shadow-lg backdrop-blur-md">
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -270,7 +271,7 @@ export function PdfPreviewSheet({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="pointer-events-auto bg-black/55 text-white hover:bg-white/15 hover:text-white"
+                    className="pointer-events-auto z-10 bg-black/55 text-white hover:bg-white/15 hover:text-white"
                     aria-label="Close"
                   />
                 }
