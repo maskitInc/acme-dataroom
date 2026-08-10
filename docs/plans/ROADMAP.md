@@ -72,3 +72,11 @@ Skip: Auth, Supabase, content PDF search — **reopened as Phase D by owner (202
 | DnD fails | Ship Move dialog only |
 | IDB fails | Memory + README banner |
 | Time overrun | Skip Should/Extra; jump to stage 10 |
+
+## Closed / not on roadmap
+
+| Idea | Status |
+|------|--------|
+| Share links / permissions ACL | **Cancelled** — SPEC non-goal; see research `11-share-links-*` (archive only) |
+| OAuth providers | **Deferred indefinitely** — magic link covers TQ extra auth |
+| Further Phase E features | **None planned** — polish only if needed for hand-in |

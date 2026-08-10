@@ -26,7 +26,7 @@ Granular UI: `rooms/`, `browser/` (RoomBrowser + NodeRow + SearchHits), `pdf/`, 
 - **Search:** room-wide name + PDF text (indexed on upload via pdf.js); UI goes through `repository.searchInRoom`
 - **Upload:** OS→browser drop anywhere on the room window (fullscreen overlay while dragging) + file picker; visible upload progress
 - **Cloud:** `SupabaseRepository` implements the same repository interface; Auth = email magic link
-- **Out of scope:** multi-type files, fine-grained share permissions, OAuth (easy to add later)
+- **Out of scope:** multi-type files, share/capability links (cancelled), OAuth (magic link covers auth extra)
 
 ## Setup
 
@@ -55,5 +55,6 @@ Schema (already applied on the linked project): `supabase/migrations/`.
 ## Plans & research
 
 - Implementation plans: [`docs/plans/`](./docs/plans/)
+- Readiness + code review: [`docs/plans/READINESS.md`](./docs/plans/READINESS.md)
 - Spec: [`docs/SPEC.md`](./docs/SPEC.md)
 - Research KB: [`docs/research/07-implementation-kb.md`](./docs/research/07-implementation-kb.md)

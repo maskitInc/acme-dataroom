@@ -58,3 +58,7 @@
 - [x] `SupabaseRepository` + bootstrap (env → cloud, else IDB)
 - [x] Magic-link AuthGate + sign out
 - [x] Ship env on Vercel + verify live deploy
+
+## Cancelled — do not implement
+- [ ] ~~Share / capability links / deactivate~~ — out of scope (SPEC non-goal)
+- [ ] ~~OAuth~~ — not required; magic link shipped
