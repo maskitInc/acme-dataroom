@@ -219,7 +219,7 @@ export function PdfPreviewSheet({
             {previewUrl && !error && (
               <div
                 data-pdf-pages
-                className="flex min-h-full min-w-full flex-col items-center px-4 py-16"
+                className="flex min-h-full min-w-full flex-col items-center justify-center px-4 py-16"
               />
             )}
           </div>
