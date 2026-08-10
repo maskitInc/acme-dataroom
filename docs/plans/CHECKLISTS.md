@@ -51,4 +51,4 @@
 ## Stage 17–18 — Phase D FTS
 - [x] Extract PDF text on upload (pdf.js) + texts store (Memory/IDB)
 - [x] `searchInRoom` + SearchHits UI (room-wide name + content)
-- [ ] Ship FTS to Vercel
+- [x] Ship FTS to Vercel
