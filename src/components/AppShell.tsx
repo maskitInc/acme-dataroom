@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { LogOut } from 'lucide-react'
 import type { DataRoom, Id, Node } from '@/domain/types'
 import { ValidationError } from '@/domain/types'
 import { useRepo } from '@/lib/repo-context'
+import { readNavFromUrl, writeNavToUrl } from '@/lib/navState'
 import { Button } from '@/components/ui/button'
 import { DataRoomList } from '@/components/rooms/DataRoomList'
 import { RoomBrowser } from '@/components/browser/RoomBrowser'
@@ -20,15 +21,41 @@ export function AppShell({
   onSignOut?: () => Promise<void>
 }) {
   const repo = useRepo()
+  const initialNav = useRef(readNavFromUrl())
   const [rooms, setRooms] = useState<DataRoom[]>([])
   const [loadingRooms, setLoadingRooms] = useState(true)
-  const [currentRoomId, setCurrentRoomId] = useState<Id | null>(null)
-  const [currentParentId, setCurrentParentId] = useState<Id | null>(null)
+  const [currentRoomId, setCurrentRoomId] = useState<Id | null>(
+    initialNav.current.roomId,
+  )
+  const [currentParentId, setCurrentParentId] = useState<Id | null>(
+    initialNav.current.folderId,
+  )
   const [children, setChildren] = useState<Node[]>([])
   const [crumbs, setCrumbs] = useState<Node[]>([])
   const [loadingChildren, setLoadingChildren] = useState(false)
+  const [navValidated, setNavValidated] = useState(!initialNav.current.roomId)
+  const skipUrlWrite = useRef(true)
 
   const currentRoom = rooms.find((r) => r.id === currentRoomId) ?? null
+
+  function goHome(mode: 'replace' | 'push' = 'push') {
+    setCurrentRoomId(null)
+    setCurrentParentId(null)
+    writeNavToUrl({ roomId: null, folderId: null }, mode)
+  }
+
+  function openRoom(id: Id, mode: 'replace' | 'push' = 'push') {
+    setCurrentRoomId(id)
+    setCurrentParentId(null)
+    writeNavToUrl({ roomId: id, folderId: null }, mode)
+  }
+
+  function openFolder(folderId: Id | null, mode: 'replace' | 'push' = 'push') {
+    setCurrentParentId(folderId)
+    if (currentRoomId) {
+      writeNavToUrl({ roomId: currentRoomId, folderId }, mode)
+    }
+  }
 
   async function refreshRooms() {
     setLoadingRooms(true)
@@ -57,9 +84,77 @@ export function AppShell({
     void refreshRooms()
   }, [repo])
 
+  // Restore / validate URL location after rooms are known
   useEffect(() => {
-    if (currentRoomId) void refreshBrowser(currentRoomId, currentParentId)
-  }, [currentRoomId, currentParentId, repo])
+    if (loadingRooms) return
+    let cancelled = false
+    void (async () => {
+      if (!currentRoomId) {
+        if (!cancelled) setNavValidated(true)
+        return
+      }
+      const roomOk = rooms.some((r) => r.id === currentRoomId)
+      if (!roomOk) {
+        if (!cancelled) {
+          skipUrlWrite.current = true
+          setCurrentRoomId(null)
+          setCurrentParentId(null)
+          writeNavToUrl({ roomId: null, folderId: null }, 'replace')
+          setNavValidated(true)
+        }
+        return
+      }
+      if (currentParentId) {
+        const node = await repo.getNode(currentParentId)
+        if (
+          cancelled ||
+          !node ||
+          node.type !== 'folder' ||
+          node.dataroomId !== currentRoomId
+        ) {
+          if (!cancelled) {
+            skipUrlWrite.current = true
+            setCurrentParentId(null)
+            writeNavToUrl({ roomId: currentRoomId, folderId: null }, 'replace')
+          }
+        }
+      }
+      if (!cancelled) setNavValidated(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [loadingRooms, rooms, currentRoomId, currentParentId, repo])
+
+  // Keep URL in sync when state changes (after first paint / restore)
+  useEffect(() => {
+    if (skipUrlWrite.current) {
+      skipUrlWrite.current = false
+      return
+    }
+    writeNavToUrl(
+      { roomId: currentRoomId, folderId: currentParentId },
+      'replace',
+    )
+  }, [currentRoomId, currentParentId])
+
+  // Browser back / forward
+  useEffect(() => {
+    function onPopState() {
+      const nav = readNavFromUrl()
+      skipUrlWrite.current = true
+      setCurrentRoomId(nav.roomId)
+      setCurrentParentId(nav.folderId)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (currentRoomId && navValidated) {
+      void refreshBrowser(currentRoomId, currentParentId)
+    }
+  }, [currentRoomId, currentParentId, repo, navValidated])
 
   function errMsg(e: unknown): string {
     if (e instanceof ValidationError) return e.message
@@ -72,8 +167,7 @@ export function AppShell({
       const room = await repo.createRoom(name)
       await refreshRooms()
       toast.success(`Created “${room.name}”`)
-      setCurrentRoomId(room.id)
-      setCurrentParentId(null)
+      openRoom(room.id)
     } catch (e) {
       toast.error(errMsg(e))
     }
@@ -84,8 +178,7 @@ export function AppShell({
       const room = await repo.seedSample()
       await refreshRooms()
       toast.success('Sample Data Room ready')
-      setCurrentRoomId(room.id)
-      setCurrentParentId(null)
+      openRoom(room.id)
     } catch (e) {
       toast.error(errMsg(e))
     }
@@ -94,10 +187,7 @@ export function AppShell({
   async function handleDeleteRoom(id: Id) {
     try {
       await repo.deleteRoom(id)
-      if (currentRoomId === id) {
-        setCurrentRoomId(null)
-        setCurrentParentId(null)
-      }
+      if (currentRoomId === id) goHome('replace')
       await refreshRooms()
       toast.success('Data Room deleted')
     } catch (e) {
@@ -113,6 +203,14 @@ export function AppShell({
     } catch (e) {
       toast.error(errMsg(e))
     }
+  }
+
+  if (currentRoomId && (!navValidated || loadingRooms || !currentRoom)) {
+    return (
+      <div className="flex min-h-svh items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    )
   }
 
   if (!currentRoomId || !currentRoom) {
@@ -156,10 +254,7 @@ export function AppShell({
           rooms={rooms}
           loading={loadingRooms}
           onCreate={handleCreateRoom}
-          onOpen={(id) => {
-            setCurrentRoomId(id)
-            setCurrentParentId(null)
-          }}
+          onOpen={(id) => openRoom(id)}
           onDelete={handleDeleteRoom}
           onSeed={handleSeed}
         />
@@ -195,11 +290,8 @@ export function AppShell({
         crumbs={crumbs}
         children={children}
         loading={loadingChildren}
-        onBackHome={() => {
-          setCurrentRoomId(null)
-          setCurrentParentId(null)
-        }}
-        onNavigate={(folderId) => setCurrentParentId(folderId)}
+        onBackHome={() => goHome()}
+        onNavigate={(folderId) => openFolder(folderId)}
         onCreateFolder={(name) =>
           mutateAndRefresh(async () => {
             await repo.createFolder(currentRoomId, currentParentId, name)
@@ -215,6 +307,16 @@ export function AppShell({
         onDeleteFolder={(id, name, n) =>
           mutateAndRefresh(async () => {
             await repo.deleteFolder(id)
+            if (currentParentId) {
+              const stillThere = await repo.getNode(currentParentId)
+              if (
+                !stillThere ||
+                stillThere.type !== 'folder' ||
+                stillThere.dataroomId !== currentRoomId
+              ) {
+                openFolder(null, 'replace')
+              }
+            }
             toast.success(`Deleted “${name}” (${n} items inside)`)
           })
         }
