@@ -57,4 +57,4 @@
 - [x] Schema: datarooms / nodes / file_texts + Storage bucket `dataroom-files` + RLS
 - [x] `SupabaseRepository` + bootstrap (env → cloud, else IDB)
 - [x] Magic-link AuthGate + sign out
-- [ ] Ship env on Vercel + verify live sign-in
+- [x] Ship env on Vercel + verify live deploy
