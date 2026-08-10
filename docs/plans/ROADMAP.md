@@ -28,7 +28,17 @@ flowchart LR
 | 9 | Slice 7 Move dialog (±DnD) | move without cycles | 40m | — |
 | 10 | Slice 8 README + deploy | Live URL + README | 40m | **Vercel** |
 
-**Total stages: 10.** Supabase = optional Extra after stage 10 — **не блокує** MVP.
+**Total Must stages: 10.** Supabase = optional Extra — **не блокує** MVP.
+
+## Phase B — Post-Must (Extra / Should ROI)
+
+| # | Етап | Вихід | Est. |
+|---|------|-------|------|
+| 11 | Filename filter + PDF drop-on-browser | SE-01, FI-02 | 30m |
+| 12 | DnD move via `@dnd-kit` (dialog remains) | MV-04 | 45m |
+| 13 | Ship Extra to prod | Live updated | 10m |
+
+Skip: Auth, Supabase (unless explicitly requested), content PDF search.
 
 ## Parallel track (з етапу 4)
 

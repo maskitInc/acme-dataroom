@@ -2,21 +2,21 @@
 
 | | |
 |--|--|
-| **Now** | Stage **10 / 10** — Done |
-| **Left** | nothing critical |
-| **Progress** | 100% |
+| **Now** | Stage **13 / 13** — shipping Extra to prod |
+| **Left** | auto-deploy verify |
+| **Progress** | 98% |
 | **Need from you** | Nothing |
 
 ## Links
 
 - **Live:** https://tailored-tech-test-gamma.vercel.app
 - **GitHub:** https://github.com/maskitInc/acme-dataroom
-- **Inspect:** https://vercel.com/maksyms-projects-d65b07f5/tailored-tech-test
 
-## Stage log
+## Stages
 
-| Stage | Status | Note |
-|-------|--------|------|
-| 1–10 | done | GitHub↔Vercel linked manually |
-
-Git push to `main` should now auto-deploy on Vercel.
+| # | Stage | Status |
+|---|-------|--------|
+| 1–10 | Must MVP + ship | done |
+| 11 | Filename filter + PDF dropzone | done |
+| 12 | DnD move (`@dnd-kit`) | done |
+| 13 | Push + verify auto-deploy | in progress |

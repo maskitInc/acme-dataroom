@@ -64,5 +64,18 @@
 - [x] README §15 complete
 - [x] GitHub repo + push
 - [x] Live Vercel URL in README
-- [x] STATUS.md → 100%
-- [ ] Optional: smoke SPEC §17 on Live in browser
+- [x] STATUS.md → 100% Must
+- [x] GitHub↔Vercel linked
+
+## Stage 11 — Filter + PDF dropzone
+- [x] Filename filter (SE-01)
+- [x] Drop PDF onto browser (FI-02)
+
+## Stage 12 — DnD
+- [x] `@dnd-kit` drag handle + drop on folders (MV-04)
+- [x] Move dialog still available
+
+## Stage 13 — Ship Extra
+- [x] README updated
+- [ ] Push + auto-deploy Ready
+

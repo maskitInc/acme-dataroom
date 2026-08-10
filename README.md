@@ -16,7 +16,9 @@ Vite + React + TypeScript + Tailwind + shadcn/ui. Client-side persistence via **
 - **Same-name uploads:** auto-suffix ` (n)` (e.g. `report.pdf` → `report (1).pdf`) with toast
 - **Cascade delete:** deleting a folder removes all nested folders/files and blobs; confirm shows count
 - **PDF viewing:** blob object URLs in a sheet + Open in new tab / Download (mobile-friendly)
-- **Move:** explicit “Move to…” dialog (reliable on mobile + desktop); DnD deferred
+- **Move:** “Move to…” dialog + drag handle (`@dnd-kit`, long-press on touch) onto folders
+- **Filter:** client-side filename filter in the current folder
+- **Upload:** file picker or drop PDF onto the browser area
 - **Out of scope:** auth, cloud blob sync, full-text search, multi-type files, permissions
 
 ## Setup
@@ -36,9 +38,10 @@ npm run build
 1. Create a Data Room (or **Load sample**)
 2. Nest folders, upload PDFs, preview
 3. Upload the same filename again → auto-rename
-4. Rename / move / delete a file
-5. Delete a folder (cascade)
-6. Refresh — data persists in IndexedDB
+4. Filter by name; drop a PDF onto the list
+5. Drag items onto a folder (grip handle) or use Move to…
+6. Delete a folder (cascade)
+7. Refresh — data persists in IndexedDB
 
 ## Plans & research
 

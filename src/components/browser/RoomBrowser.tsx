@@ -1,4 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import {
   ArrowLeft,
   Download,
@@ -6,14 +19,17 @@ import {
   FileText,
   Folder,
   FolderPlus,
+  GripVertical,
   MoreHorizontal,
   Pencil,
+  Search,
   Trash2,
   Upload,
   FolderInput,
 } from 'lucide-react'
 import type { DataRoom, Id, Node } from '@/domain/types'
 import { formatBytes } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Breadcrumb,
@@ -45,6 +61,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { toast } from 'sonner'
 
 export function RoomBrowser({
   room,
@@ -82,6 +99,8 @@ export function RoomBrowser({
   countDescendants: (folderId: Id) => Promise<number>
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
+  const [fileDragOver, setFileDragOver] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [renameTarget, setRenameTarget] = useState<Node | null>(null)
@@ -94,6 +113,20 @@ export function RoomBrowser({
   const [preview, setPreview] = useState<Node | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const [activeDrag, setActiveDrag] = useState<Node | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 220, tolerance: 6 },
+    }),
+  )
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return children
+    return children.filter((n) => n.name.toLowerCase().includes(q))
+  }, [children, query])
 
   useEffect(() => {
     return () => {
@@ -136,9 +169,35 @@ export function RoomBrowser({
     setMoveTarget(node)
     setMoveDest(null)
     const all = await listAllFolders()
-    // exclude self and descendants for folders — simplified: exclude self only in UI;
-    // repo blocks cycles
     setFolders(all.filter((f) => f.id !== node.id))
+  }
+
+  function handleOsFileDrop(e: DragEvent) {
+    e.preventDefault()
+    setFileDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    void onUpload(file)
+  }
+
+  function onDragStart(event: DragStartEvent) {
+    const node = event.active.data.current?.node as Node | undefined
+    setActiveDrag(node ?? null)
+  }
+
+  async function onDragEnd(event: DragEndEvent) {
+    setActiveDrag(null)
+    const { active, over } = event
+    if (!over) return
+    const dragged = active.data.current?.node as Node | undefined
+    const folderId = over.data.current?.folderId as Id | undefined
+    if (!dragged || !folderId) return
+    if (dragged.id === folderId) return
+    try {
+      await onMove(dragged.id, folderId)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Move failed')
+    }
   }
 
   return (
@@ -186,7 +245,7 @@ export function RoomBrowser({
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           onClick={() => {
@@ -199,6 +258,16 @@ export function RoomBrowser({
         <Button onClick={() => fileRef.current?.click()}>
           <Upload /> Upload PDF
         </Button>
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="Filter by name…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Filter files and folders"
+          />
+        </div>
         <input
           ref={fileRef}
           type="file"
@@ -212,102 +281,105 @@ export function RoomBrowser({
         />
       </div>
 
-      {loading ? (
-        <p className="text-muted-foreground">Loading…</p>
-      ) : children.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-8">
-          <p className="font-medium text-foreground">This folder is empty</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create a nested folder or upload a PDF.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setFolderName('')
-                setCreateOpen(true)
-              }}
-            >
-              <FolderPlus /> New folder
-            </Button>
-            <Button onClick={() => fileRef.current?.click()}>
-              <Upload /> Upload PDF
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <ul className="divide-y rounded-xl border">
-          {children.map((node) => (
-            <li
-              key={node.id}
-              className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/40"
-            >
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      <div
+        className={cn(
+          'rounded-xl transition-colors',
+          fileDragOver && 'ring-2 ring-primary ring-offset-2',
+        )}
+        onDragEnter={(e) => {
+          if (e.dataTransfer.types.includes('Files')) {
+            e.preventDefault()
+            setFileDragOver(true)
+          }
+        }}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('Files')) {
+            e.preventDefault()
+            setFileDragOver(true)
+          }
+        }}
+        onDragLeave={() => setFileDragOver(false)}
+        onDrop={handleOsFileDrop}
+      >
+        {loading ? (
+          <p className="p-4 text-muted-foreground">Loading…</p>
+        ) : children.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-8">
+            <p className="font-medium text-foreground">This folder is empty</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create a nested folder, upload a PDF, or drop a PDF here.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
                 onClick={() => {
-                  if (node.type === 'folder') onNavigate(node.id)
-                  else void openPreview(node)
+                  setFolderName('')
+                  setCreateOpen(true)
                 }}
               >
-                {node.type === 'folder' ? (
-                  <Folder className="size-5 shrink-0 text-muted-foreground" />
-                ) : (
-                  <FileText className="size-5 shrink-0 text-muted-foreground" />
-                )}
-                <div className="min-w-0">
-                  <div className="truncate font-medium text-foreground">
-                    {node.name}
-                  </div>
-                  {node.type === 'file' && (
-                    <div className="text-xs text-muted-foreground">
-                      {formatBytes(node.size)} ·{' '}
-                      {new Date(node.updatedAt).toLocaleDateString()}
-                    </div>
-                  )}
+                <FolderPlus /> New folder
+              </Button>
+              <Button onClick={() => fileRef.current?.click()}>
+                <Upload /> Upload PDF
+              </Button>
+            </div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-8">
+            <p className="font-medium text-foreground">No matches</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Nothing matches “{query.trim()}”.
+            </p>
+            <Button variant="outline" className="mt-4" onClick={() => setQuery('')}>
+              Clear filter
+            </Button>
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            onDragStart={onDragStart}
+            onDragEnd={(e) => void onDragEnd(e)}
+            onDragCancel={() => setActiveDrag(null)}
+          >
+            <ul className="divide-y rounded-xl border">
+              {filtered.map((node) => (
+                <NodeRow
+                  key={node.id}
+                  node={node}
+                  onOpen={() => {
+                    if (node.type === 'folder') onNavigate(node.id)
+                    else void openPreview(node)
+                  }}
+                  onRename={() => {
+                    setRenameTarget(node)
+                    setRenameValue(node.name)
+                  }}
+                  onMove={() => void openMove(node)}
+                  onDelete={() => {
+                    void (async () => {
+                      setDeleteTarget(node)
+                      if (node.type === 'folder') {
+                        setDeleteCount(await countDescendants(node.id))
+                      } else setDeleteCount(0)
+                    })()
+                  }}
+                />
+              ))}
+            </ul>
+            <DragOverlay>
+              {activeDrag ? (
+                <div className="rounded-md border bg-background px-3 py-2 text-sm shadow-md">
+                  {activeDrag.name}
                 </div>
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                    className="inline-flex size-7 items-center justify-center rounded-lg hover:bg-muted"
-                    aria-label="Item actions"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setRenameTarget(node)
-                      setRenameValue(node.name)
-                    }}
-                  >
-                    <Pencil /> Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void openMove(node)}>
-                    <FolderInput /> Move to…
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => {
-                      void (async () => {
-                        setDeleteTarget(node)
-                        if (node.type === 'folder') {
-                          setDeleteCount(await countDescendants(node.id))
-                        } else setDeleteCount(0)
-                      })()
-                    }}
-                  >
-                    <Trash2 /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </li>
-          ))}
-        </ul>
-      )}
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+        {fileDragOver && (
+          <p className="mt-2 text-center text-sm text-primary">Drop PDF to upload</p>
+        )}
+      </div>
 
-      {/* Create folder */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
@@ -342,7 +414,6 @@ export function RoomBrowser({
         </DialogContent>
       </Dialog>
 
-      {/* Rename */}
       <Dialog
         open={!!renameTarget}
         onOpenChange={(o) => !o && setRenameTarget(null)}
@@ -381,7 +452,6 @@ export function RoomBrowser({
         </DialogContent>
       </Dialog>
 
-      {/* Delete */}
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
@@ -408,7 +478,6 @@ export function RoomBrowser({
         </DialogContent>
       </Dialog>
 
-      {/* Move */}
       <Dialog open={!!moveTarget} onOpenChange={(o) => !o && setMoveTarget(null)}>
         <DialogContent>
           <DialogHeader>
@@ -455,17 +524,13 @@ export function RoomBrowser({
         </DialogContent>
       </Dialog>
 
-      {/* PDF preview */}
       <Sheet
         open={!!preview}
         onOpenChange={(o) => {
           if (!o) closePreview()
         }}
       >
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col sm:max-w-xl"
-        >
+        <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl">
           <SheetHeader>
             <SheetTitle className="truncate pr-8">{preview?.name}</SheetTitle>
           </SheetHeader>
@@ -511,5 +576,103 @@ export function RoomBrowser({
         </SheetContent>
       </Sheet>
     </div>
+  )
+}
+
+function NodeRow({
+  node,
+  onOpen,
+  onRename,
+  onMove,
+  onDelete,
+}: {
+  node: Node
+  onOpen: () => void
+  onRename: () => void
+  onMove: () => void
+  onDelete: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    transform,
+    isDragging,
+  } = useDraggable({
+    id: `drag-${node.id}`,
+    data: { node },
+  })
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `drop-${node.id}`,
+    data: { folderId: node.id },
+    disabled: node.type !== 'folder',
+  })
+
+  function setRefs(el: HTMLLIElement | null) {
+    setDragRef(el)
+    if (node.type === 'folder') setDropRef(el)
+  }
+
+  return (
+    <li
+      ref={setRefs}
+      style={{ transform: CSS.Translate.toString(transform) }}
+      className={cn(
+        'flex items-center gap-1 px-2 py-2.5 hover:bg-muted/40',
+        isDragging && 'opacity-40',
+        isOver && node.type === 'folder' && 'bg-primary/10 ring-1 ring-primary/40',
+      )}
+    >
+      <button
+        type="button"
+        className="inline-flex size-7 shrink-0 touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+        aria-label="Drag to move"
+        {...listeners}
+        {...attributes}
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        onClick={onOpen}
+      >
+        {node.type === 'folder' ? (
+          <Folder className="size-5 shrink-0 text-muted-foreground" />
+        ) : (
+          <FileText className="size-5 shrink-0 text-muted-foreground" />
+        )}
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">{node.name}</div>
+          {node.type === 'file' && (
+            <div className="text-xs text-muted-foreground">
+              {formatBytes(node.size)} ·{' '}
+              {new Date(node.updatedAt).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="inline-flex size-7 items-center justify-center rounded-lg hover:bg-muted"
+          aria-label="Item actions"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onRename}>
+            <Pencil /> Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onMove}>
+            <FolderInput /> Move to…
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2 /> Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </li>
   )
 }
