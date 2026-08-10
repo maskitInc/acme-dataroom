@@ -103,7 +103,8 @@ export function PdfPreviewSheet({
           canvas.height = viewport.height
           canvas.style.width = `${viewport.width / devicePixelRatio}px`
           canvas.style.height = `${viewport.height / devicePixelRatio}px`
-          canvas.className = 'mx-auto mb-4 block bg-white shadow-md'
+          canvas.className =
+            'mx-auto mb-4 block max-w-full bg-white shadow-md last:mb-0'
           const ctx = canvas.getContext('2d')
           if (!ctx) continue
           await page.render({ canvas, canvasContext: ctx, viewport }).promise
@@ -178,10 +179,11 @@ export function PdfPreviewSheet({
         showCloseButton={false}
         className={cn(
           'flex flex-col gap-0 overflow-hidden border-0 bg-neutral-900 p-0 text-white shadow-2xl',
-          // Flush to top (100dvh); desktop ~90% width centered
-          'w-full max-w-none rounded-none',
-          'data-[side=bottom]:inset-x-0 data-[side=bottom]:top-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-[100dvh]',
-          'sm:data-[side=bottom]:inset-x-[5%] sm:data-[side=bottom]:rounded-t-2xl',
+          // Position by left/right insets only — never w-full + left%, that shifts the box right
+          'max-w-none rounded-none',
+          'data-[side=bottom]:top-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-[100dvh]',
+          'data-[side=bottom]:left-0 data-[side=bottom]:right-0 data-[side=bottom]:w-auto',
+          'sm:data-[side=bottom]:left-[5%] sm:data-[side=bottom]:right-[5%] sm:data-[side=bottom]:rounded-t-2xl',
           // Full slide up / down
           'duration-300 ease-out',
           'data-starting-style:opacity-100 data-ending-style:opacity-100',
