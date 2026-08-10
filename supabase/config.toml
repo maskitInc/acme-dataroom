@@ -1,0 +1,16 @@
+# https://supabase.com/docs/guides/cli/config
+project_id = "chsepsbqkfyakjqrktzy"
+
+[auth]
+enabled = true
+site_url = "https://tailored-tech-test-gamma.vercel.app"
+additional_redirect_urls = [
+  "https://tailored-tech-test-gamma.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

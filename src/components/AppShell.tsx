@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { LogOut } from 'lucide-react'
 import type { DataRoom, Id, Node } from '@/domain/types'
 import { ValidationError } from '@/domain/types'
 import { useRepo } from '@/lib/repo-context'
+import { Button } from '@/components/ui/button'
 import { DataRoomList } from '@/components/rooms/DataRoomList'
 import { RoomBrowser } from '@/components/browser/RoomBrowser'
 
 export function AppShell({
   persistenceDegraded,
+  cloudMode = false,
+  userEmail = null,
+  onSignOut,
 }: {
   persistenceDegraded: boolean
+  cloudMode?: boolean
+  userEmail?: string | null
+  onSignOut?: () => Promise<void>
 }) {
   const repo = useRepo()
   const [rooms, setRooms] = useState<DataRoom[]>([])
@@ -115,6 +123,27 @@ export function AppShell({
             Storage unavailable — data lasts until you close the tab.
           </div>
         )}
+        {cloudMode && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              Cloud · signed in as{' '}
+              <span className="text-foreground">{userEmail ?? 'user'}</span>
+            </span>
+            {onSignOut && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  void onSignOut().catch((e) =>
+                    toast.error(e instanceof Error ? e.message : 'Sign out failed'),
+                  )
+                }
+              >
+                <LogOut /> Sign out
+              </Button>
+            )}
+          </div>
+        )}
         <header className="mb-8 text-left">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Acme Data Room
@@ -143,6 +172,21 @@ export function AppShell({
       {persistenceDegraded && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Storage unavailable — data lasts until you close the tab.
+        </div>
+      )}
+      {cloudMode && onSignOut && (
+        <div className="mb-3 flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              void onSignOut().catch((e) =>
+                toast.error(e instanceof Error ? e.message : 'Sign out failed'),
+              )
+            }
+          >
+            <LogOut /> Sign out
+          </Button>
         </div>
       )}
       <RoomBrowser

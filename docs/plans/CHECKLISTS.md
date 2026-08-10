@@ -52,3 +52,9 @@
 - [x] Extract PDF text on upload (pdf.js) + texts store (Memory/IDB)
 - [x] `searchInRoom` + SearchHits UI (room-wide name + content)
 - [x] Ship FTS to Vercel
+
+## Stage 19–22 — Phase D Supabase + Auth
+- [x] Schema: datarooms / nodes / file_texts + Storage bucket `dataroom-files` + RLS
+- [x] `SupabaseRepository` + bootstrap (env → cloud, else IDB)
+- [x] Magic-link AuthGate + sign out
+- [ ] Ship env on Vercel + verify live sign-in
