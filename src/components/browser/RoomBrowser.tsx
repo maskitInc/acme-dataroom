@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   TouchSensor,
+  pointerWithin,
+  rectIntersection,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   ArrowLeft,
-  Folder,
   FolderPlus,
   Search,
   Upload,
@@ -48,28 +50,48 @@ import {
 const SEARCH_DEBOUNCE_MS = 250
 const ROOT_DROP_ID = 'drop-root'
 
-/** Droppable for room root (`parentId = null`). Shown while an in-app drag is active. */
-function RoomRootDropZone({ visible }: { visible: boolean }) {
+/**
+ * Prefer row droppables over the list-surface root droppable so nesting
+ * into a folder still wins when the pointer is over that row.
+ */
+const preferRowOverListSurface: CollisionDetection = (args) => {
+  const pointer = pointerWithin(args)
+  const pointerRows = pointer.filter((c) => c.id !== ROOT_DROP_ID)
+  if (pointerRows.length > 0) return pointerRows
+  const pointerRoot = pointer.find((c) => c.id === ROOT_DROP_ID)
+  if (pointerRoot) return [pointerRoot]
+
+  const rect = rectIntersection(args)
+  const rectRows = rect.filter((c) => c.id !== ROOT_DROP_ID)
+  if (rectRows.length > 0) return rectRows
+  const rectRoot = rect.find((c) => c.id === ROOT_DROP_ID)
+  if (rectRoot) return [rectRoot]
+  return rect
+}
+
+/** List / empty chrome: drop here → current view parent (`null` = room root). */
+function OutlineListSurface({
+  parentId,
+  children,
+  className,
+}: {
+  parentId: Id | null
+  children: ReactNode
+  className?: string
+}) {
   const { setNodeRef, isOver } = useDroppable({
     id: ROOT_DROP_ID,
-    data: { folderId: null },
+    data: { folderId: parentId },
   })
   return (
     <div
       ref={setNodeRef}
-      aria-hidden={!visible}
       className={cn(
-        'flex items-center gap-2 border-b px-3 text-sm transition-colors',
-        visible
-          ? 'py-2.5 text-muted-foreground'
-          : 'h-0 overflow-hidden border-b-0 p-0',
-        visible &&
-          isOver &&
-          'bg-primary/10 text-foreground ring-1 ring-inset ring-primary/40',
+        className,
+        isOver && 'bg-primary/5 ring-2 ring-inset ring-primary/30',
       )}
     >
-      <Folder className="size-4 shrink-0" />
-      Room root
+      {children}
     </div>
   )
 }
@@ -310,7 +332,7 @@ export function RoomBrowser({
     const dragged = active.data.current?.node as Node | undefined
     if (!dragged) return
     const overData = over.data.current
-    // Only our folder / root droppables carry `folderId` (null = room root)
+    // Row / list-surface droppables carry `folderId` (null = room root)
     if (!overData || !('folderId' in overData)) return
     const newParentId = overData.folderId as Id | null
     if (dragged.parentId === newParentId) return
@@ -327,6 +349,69 @@ export function RoomBrowser({
       toast.error(err instanceof Error ? err.message : 'Move failed')
     }
   }
+
+  const outlineList = (
+    <OutlineListSurface
+      parentId={parentId}
+      className="min-h-[8rem] overflow-hidden rounded-xl border pb-10"
+    >
+      <ul className="divide-y">
+        {outlineRows.map(({ node, depth, hasChildren }) => (
+          <NodeRow
+            key={node.id}
+            node={node}
+            depth={depth}
+            hasChildren={hasChildren}
+            expanded={expandedIds.has(node.id)}
+            onToggleExpand={() => toggleExpand(node.id)}
+            onOpen={() => {
+              if (node.type === 'folder') onNavigate(node.id)
+              else void openPreview(node)
+            }}
+            onRename={() => {
+              setRenameTarget(node)
+              setRenameValue(node.name)
+            }}
+            onMove={() => openMove(node)}
+            onDelete={() => {
+              void (async () => {
+                setDeleteTarget(node)
+                if (node.type === 'folder') {
+                  setDeleteCount(await countDescendants(node.id))
+                } else setDeleteCount(0)
+              })()
+            }}
+          />
+        ))}
+      </ul>
+    </OutlineListSurface>
+  )
+
+  const emptyList = (
+    <OutlineListSurface parentId={parentId}>
+      <div className="rounded-xl border border-dashed border-muted-foreground/40 p-8">
+        <p className="font-medium text-foreground">This folder is empty</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Create a nested folder, upload a PDF, or drag a PDF anywhere onto this
+          window. Drop an in-app item here to move it into this folder.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setFolderName('')
+              setCreateOpen(true)
+            }}
+          >
+            <FolderPlus /> New folder
+          </Button>
+          <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
+            <Upload /> Upload PDF
+          </Button>
+        </div>
+      </div>
+    </OutlineListSurface>
+  )
 
   return (
     <div className="relative flex flex-col gap-4 text-left">
@@ -438,67 +523,15 @@ export function RoomBrowser({
           />
         ) : loading ? (
           <p className="p-4 text-muted-foreground">Loading…</p>
-        ) : outlineRows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-muted-foreground/40 p-8">
-            <p className="font-medium text-foreground">This folder is empty</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create a nested folder, upload a PDF, or drag a PDF anywhere onto
-              this window.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setFolderName('')
-                  setCreateOpen(true)
-                }}
-              >
-                <FolderPlus /> New folder
-              </Button>
-              <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
-                <Upload /> Upload PDF
-              </Button>
-            </div>
-          </div>
         ) : (
           <DndContext
             sensors={sensors}
+            collisionDetection={preferRowOverListSurface}
             onDragStart={onDragStart}
             onDragEnd={(e) => void onDragEnd(e)}
             onDragCancel={() => setActiveDrag(null)}
           >
-            <div className="overflow-hidden rounded-xl border">
-              <RoomRootDropZone visible={activeDrag != null} />
-              <ul className="divide-y">
-                {outlineRows.map(({ node, depth, hasChildren }) => (
-                  <NodeRow
-                    key={node.id}
-                    node={node}
-                    depth={depth}
-                    hasChildren={hasChildren}
-                    expanded={expandedIds.has(node.id)}
-                    onToggleExpand={() => toggleExpand(node.id)}
-                    onOpen={() => {
-                      if (node.type === 'folder') onNavigate(node.id)
-                      else void openPreview(node)
-                    }}
-                    onRename={() => {
-                      setRenameTarget(node)
-                      setRenameValue(node.name)
-                    }}
-                    onMove={() => openMove(node)}
-                    onDelete={() => {
-                      void (async () => {
-                        setDeleteTarget(node)
-                        if (node.type === 'folder') {
-                          setDeleteCount(await countDescendants(node.id))
-                        } else setDeleteCount(0)
-                      })()
-                    }}
-                  />
-                ))}
-              </ul>
-            </div>
+            {outlineRows.length === 0 ? emptyList : outlineList}
             <DragOverlay>
               {activeDrag ? (
                 <div className="rounded-md border bg-background px-3 py-2 text-sm shadow-md">

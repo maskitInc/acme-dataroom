@@ -58,15 +58,16 @@ export function NodeRow({
     data: { node },
   })
 
+  // Folder → nest into it. File → move beside it (same parent; root file ⇒ parentId null).
+  const dropParentId = node.type === 'folder' ? node.id : node.parentId
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop-${node.id}`,
-    data: { folderId: node.id },
-    disabled: node.type !== 'folder',
+    data: { folderId: dropParentId },
   })
 
   function setRefs(el: HTMLLIElement | null) {
     setDragRef(el)
-    if (node.type === 'folder') setDropRef(el)
+    setDropRef(el)
   }
 
   return (
@@ -76,7 +77,10 @@ export function NodeRow({
       className={cn(
         'flex items-center gap-0.5 py-2.5 pr-2 hover:bg-muted/40',
         isDragging && 'opacity-40',
-        isOver && node.type === 'folder' && 'bg-primary/10 ring-1 ring-primary/40',
+        isOver &&
+          node.type === 'folder' &&
+          'bg-primary/10 ring-1 ring-primary/40',
+        isOver && node.type === 'file' && 'bg-muted/70',
       )}
     >
       <span
