@@ -4,6 +4,7 @@ import {
   DragOverlay,
   PointerSensor,
   TouchSensor,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -11,6 +12,7 @@ import {
 } from '@dnd-kit/core'
 import {
   ArrowLeft,
+  Folder,
   FolderPlus,
   Search,
   Upload,
@@ -44,6 +46,33 @@ import {
 } from '@/components/dialogs/BrowserDialogs'
 
 const SEARCH_DEBOUNCE_MS = 250
+const ROOT_DROP_ID = 'drop-root'
+
+/** Droppable for room root (`parentId = null`). Shown while an in-app drag is active. */
+function RoomRootDropZone({ visible }: { visible: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: ROOT_DROP_ID,
+    data: { folderId: null },
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      aria-hidden={!visible}
+      className={cn(
+        'flex items-center gap-2 border-b px-3 text-sm transition-colors',
+        visible
+          ? 'py-2.5 text-muted-foreground'
+          : 'h-0 overflow-hidden border-b-0 p-0',
+        visible &&
+          isOver &&
+          'bg-primary/10 text-foreground ring-1 ring-inset ring-primary/40',
+      )}
+    >
+      <Folder className="size-4 shrink-0" />
+      Room root
+    </div>
+  )
+}
 
 export function RoomBrowser({
   room,
@@ -279,15 +308,21 @@ export function RoomBrowser({
     const { active, over } = event
     if (!over) return
     const dragged = active.data.current?.node as Node | undefined
-    const folderId = over.data.current?.folderId as Id | undefined
-    if (!dragged || !folderId) return
-    if (dragged.id === folderId) return
-    if (wouldCreateCycle(dragged.id, folderId, nodesById)) {
-      toast.error('Cannot move a folder into itself or a descendant')
-      return
+    if (!dragged) return
+    const overData = over.data.current
+    // Only our folder / root droppables carry `folderId` (null = room root)
+    if (!overData || !('folderId' in overData)) return
+    const newParentId = overData.folderId as Id | null
+    if (dragged.parentId === newParentId) return
+    if (newParentId != null) {
+      if (dragged.id === newParentId) return
+      if (wouldCreateCycle(dragged.id, newParentId, nodesById)) {
+        toast.error('Cannot move a folder into itself or a descendant')
+        return
+      }
     }
     try {
-      await onMove(dragged.id, folderId)
+      await onMove(dragged.id, newParentId)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Move failed')
     }
@@ -432,35 +467,38 @@ export function RoomBrowser({
             onDragEnd={(e) => void onDragEnd(e)}
             onDragCancel={() => setActiveDrag(null)}
           >
-            <ul className="divide-y rounded-xl border">
-              {outlineRows.map(({ node, depth, hasChildren }) => (
-                <NodeRow
-                  key={node.id}
-                  node={node}
-                  depth={depth}
-                  hasChildren={hasChildren}
-                  expanded={expandedIds.has(node.id)}
-                  onToggleExpand={() => toggleExpand(node.id)}
-                  onOpen={() => {
-                    if (node.type === 'folder') onNavigate(node.id)
-                    else void openPreview(node)
-                  }}
-                  onRename={() => {
-                    setRenameTarget(node)
-                    setRenameValue(node.name)
-                  }}
-                  onMove={() => openMove(node)}
-                  onDelete={() => {
-                    void (async () => {
-                      setDeleteTarget(node)
-                      if (node.type === 'folder') {
-                        setDeleteCount(await countDescendants(node.id))
-                      } else setDeleteCount(0)
-                    })()
-                  }}
-                />
-              ))}
-            </ul>
+            <div className="overflow-hidden rounded-xl border">
+              <RoomRootDropZone visible={activeDrag != null} />
+              <ul className="divide-y">
+                {outlineRows.map(({ node, depth, hasChildren }) => (
+                  <NodeRow
+                    key={node.id}
+                    node={node}
+                    depth={depth}
+                    hasChildren={hasChildren}
+                    expanded={expandedIds.has(node.id)}
+                    onToggleExpand={() => toggleExpand(node.id)}
+                    onOpen={() => {
+                      if (node.type === 'folder') onNavigate(node.id)
+                      else void openPreview(node)
+                    }}
+                    onRename={() => {
+                      setRenameTarget(node)
+                      setRenameValue(node.name)
+                    }}
+                    onMove={() => openMove(node)}
+                    onDelete={() => {
+                      void (async () => {
+                        setDeleteTarget(node)
+                        if (node.type === 'folder') {
+                          setDeleteCount(await countDescendants(node.id))
+                        } else setDeleteCount(0)
+                      })()
+                    }}
+                  />
+                ))}
+              </ul>
+            </div>
             <DragOverlay>
               {activeDrag ? (
                 <div className="rounded-md border bg-background px-3 py-2 text-sm shadow-md">
